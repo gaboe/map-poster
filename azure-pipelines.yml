@@ -1,0 +1,219 @@
+trigger:
+  batch: "true"
+  branches:
+    include:
+      - test
+      - prod
+
+pr:
+  branches:
+    include:
+      - "*"
+
+pool: SHARED-BUILD-NIX-03
+
+variables:
+  imageRepository: "map-poster"
+  imageTag: "$(Build.BuildNumber)"
+  artifactName: "drop"
+  containerRegistryServiceConnection: "ACR"
+  containerRegistry: "blogicapps2-fgbjaff4hhdzcga7.azurecr.io"
+  # Use local disk for Bun's global cache to avoid slow FS.
+  BUN_INSTALL_CACHE_DIR: "/tmp/bun-cache"
+  ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/prod'), eq(variables['System.PullRequest.TargetBranch'], 'prod')) }}:
+    buildEnvironment: "prod"
+  ${{ else }}:
+    buildEnvironment: "test"
+
+resources:
+  repositories:
+    - repository: shared
+      type: git
+      name: DevOpsShared/DevOpsShared
+
+    # OPTIONAL: GitHub repository resource for hybrid Azure DevOps + GitHub setup
+    # Uncomment and configure if you want to build from GitHub repository
+    # Steps to enable:
+    # 1. Create GitHub Service Connection in Azure DevOps:
+    #    Project Settings → Service connections → New → GitHub
+    # 2. Update 'endpoint' to match your service connection name
+    # 3. Update 'name' to your GitHub organization/repository
+    # 4. Uncomment lines below
+    #
+    # - repository: github
+    #   type: github
+    #   endpoint: YOUR_GITHUB_CONNECTION_NAME
+    #   name: YOUR_ORG/YOUR_REPO
+    #   trigger:
+    #     branches:
+    #       include:
+    #         - test
+    #         - prod
+
+stages:
+  - stage: CheckCodeQuality
+    displayName: "Check code quality and typecheck"
+    dependsOn: []
+    jobs:
+      - job: CheckCodeQuality
+        displayName: "Check code quality and typecheck"
+        steps:
+          - script: |
+              set -e
+              BUN_VERSION="1.3.8"
+
+              if ! command -v unzip >/dev/null 2>&1; then
+                echo "unzip missing; trying to install"
+                if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+                  sudo apt-get update && sudo apt-get install -y unzip
+                elif [ "$(id -u)" = "0" ]; then
+                  apt-get update && apt-get install -y unzip
+                else
+                  echo "WARNING: cannot install unzip (no sudo)."
+                fi
+              fi
+
+              CURRENT_BUN_VERSION="$($HOME/.bun/bin/bun --version 2>/dev/null || true)"
+              if [ "$CURRENT_BUN_VERSION" != "$BUN_VERSION" ]; then
+                curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
+              fi
+
+              echo "##vso[task.prependpath]$HOME/.bun/bin"
+              $HOME/.bun/bin/bun --version
+            displayName: "Setup Bun"
+          - task: Cache@2
+            inputs:
+              key: 'bun | "$(Agent.OS)" | bun.lock'
+              restoreKeys: bun | "$(Agent.OS)"
+              path: $(BUN_INSTALL_CACHE_DIR)
+            displayName: "Cache Bun packages"
+          - script: |
+              mkdir -p "$BUN_INSTALL_CACHE_DIR"
+              bun install --frozen-lockfile
+            displayName: "Install dependencies"
+            env:
+              BUN_INSTALL_CACHE_DIR: $(BUN_INSTALL_CACHE_DIR)
+          - script: bun run check:ci
+            displayName: "Run code quality check and typecheck"
+          - script: bun run test:coverage
+            displayName: "Run tests with coverage"
+
+          # Required by PublishCodeCoverageResults@2 to generate HTML report.
+          - task: UseDotNet@2
+            displayName: "Install .NET SDK (coverage report generator)"
+            inputs:
+              packageType: "sdk"
+              version: "8.x"
+
+          - task: PublishCodeCoverageResults@2
+            displayName: "Publish code coverage to Azure DevOps"
+            inputs:
+              summaryFileLocation: "$(Build.SourcesDirectory)/coverage/lcov.info"
+              pathToSources: "$(Build.SourcesDirectory)"
+              failIfCoverageEmpty: true
+            condition: succeededOrFailed()
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: "$(Build.SourcesDirectory)/coverage"
+              artifact: "coverage"
+            displayName: "Publish coverage artifact"
+            condition: succeededOrFailed()
+
+  - stage: Build
+    displayName: "Build Monorepo"
+    dependsOn: [CheckCodeQuality]
+    variables:
+      - ${{ if eq(variables.buildEnvironment, 'prod') }}:
+          - group: CONFIG-MAP-POSTER-TS-PROD
+      - ${{ else }}:
+          - group: CONFIG-MAP-POSTER-TS-TEST
+    jobs:
+      - template: azp/jobs/build-docker-image.yml
+        parameters:
+          jobName: BuildWebApp
+          displayName: "Build and Push Web App"
+          repository: $(imageRepository)-web-app
+          dockerfilePath: "$(Build.SourcesDirectory)/apps/web-app/Dockerfile"
+          buildContext: "$(Build.SourcesDirectory)"
+          buildArgs: |
+            --build-arg VERSION=$(imageRepository)-$(Build.BuildNumber)
+            --build-arg BUILD_ENV=$(buildEnvironment)
+            --build-arg GIT_COMMIT_SHA=$(Build.SourceVersion)
+          secrets: "--secret id=sentry_auth_token,env=SENTRY_AUTH_TOKEN"
+          containerRegistryServiceConnection: $(containerRegistryServiceConnection)
+          tag: $(imageTag)
+
+      # Build base layer first (contains bun install - the expensive step)
+      - template: azp/jobs/build-docker-image.yml
+        parameters:
+          jobName: BuildJobsBase
+          displayName: "Build and Push Jobs Base"
+          repository: $(imageRepository)/jobs-base
+          dockerfilePath: "$(Build.SourcesDirectory)/jobs/Dockerfile"
+          buildContext: "$(Build.SourcesDirectory)"
+          extraArgs: "--target base"
+          containerRegistryServiceConnection: $(containerRegistryServiceConnection)
+          tag: $(imageTag)
+
+      # All job builds depend on base and use --cache-from for instant bun install
+      - template: azp/jobs/build-docker-image.yml
+        parameters:
+          jobName: BuildPreDeployment
+          displayName: "Build and Push Pre-Deployment Job"
+          repository: $(imageRepository)/pre-deployment
+          dockerfilePath: "$(Build.SourcesDirectory)/jobs/Dockerfile"
+          buildContext: "$(Build.SourcesDirectory)"
+          extraArgs: "--target pre-deployment --cache-from $(containerRegistry)/$(imageRepository)/jobs-base:$(imageTag)"
+          containerRegistryServiceConnection: $(containerRegistryServiceConnection)
+          tag: $(imageTag)
+          dependsOn: [BuildJobsBase]
+
+      - template: azp/jobs/build-docker-image.yml
+        parameters:
+          jobName: BuildPostDeployment
+          displayName: "Build and Push Post-Deployment Job"
+          repository: $(imageRepository)/post-deployment
+          dockerfilePath: "$(Build.SourcesDirectory)/jobs/Dockerfile"
+          buildContext: "$(Build.SourcesDirectory)"
+          extraArgs: "--target post-deployment --cache-from $(containerRegistry)/$(imageRepository)/jobs-base:$(imageTag)"
+          containerRegistryServiceConnection: $(containerRegistryServiceConnection)
+          tag: $(imageTag)
+          dependsOn: [BuildJobsBase]
+
+      - template: azp/jobs/publish-helm-charts.yml
+        parameters:
+          artifactName: $(artifactName)
+
+  # TEST Environment Deployment
+  # To switch between Azure and Cloudfleet, change the deploymentTarget parameter below:
+  # - deploymentTarget: azure
+  # - deploymentTarget: cloudfleet
+  - template: azp/stages/deploy-environment.yml
+    parameters:
+      environment: test
+      dependsOn:
+        - Build
+      condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/test'))
+      namespace: map-poster-test
+      tag: $(imageTag)
+      variableGroup: CONFIG-MAP-POSTER-TS-TEST
+      imageRepository: $(imageRepository)
+      serviceConnection: "aks-test-northeurope-01"
+      deploymentTarget: azure
+
+  # PROD Environment Deployment
+  # To switch between Azure and Cloudfleet, change the deploymentTarget parameter below:
+  # - deploymentTarget: azure
+  # - deploymentTarget: cloudfleet
+  - template: azp/stages/deploy-environment.yml
+    parameters:
+      environment: prod
+      dependsOn:
+        - Build
+      condition: and(succeeded(), in(variables['Build.SourceBranch'], 'refs/heads/prod'))
+      namespace: map-poster-prod
+      tag: $(imageTag)
+      variableGroup: CONFIG-MAP-POSTER-TS-PROD
+      imageRepository: $(imageRepository)
+      serviceConnection: "aks-test-northeurope-01"
+      deploymentTarget: azure

@@ -1,0 +1,185 @@
+name: 🦋 Changesets Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      type:
+        description: "Select release type"
+        required: true
+        type: choice
+        options:
+          - release
+          - prerelease
+        default: "prerelease"
+      ref:
+        description: "The ref (branch, tag, or SHA) to checkout and release from"
+        required: true
+        type: string
+      prerelease_tag:
+        description: "The npm dist-tag for the prerelease (e.g., 'v4-prerelease')"
+        required: false
+        type: string
+        default: "prerelease"
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  show-release-summary:
+    name: 📋 Release Summary
+    runs-on: ubuntu-latest
+    if: |
+      github.repository == 'triggerdotdev/trigger.dev' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'changeset-release/main'
+    steps:
+      - name: Show release summary
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "$PR_BODY" | sed -n '/^# Releases/,$p' >> $GITHUB_STEP_SUMMARY
+
+  release:
+    name: 🚀 Release npm packages
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    if: |
+      github.repository == 'triggerdotdev/trigger.dev' &&
+      (
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release') ||
+        (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'changeset-release/main')
+      )
+    outputs:
+      published: ${{ steps.changesets.outputs.published }}
+      published_packages: ${{ steps.changesets.outputs.publishedPackages }}
+      published_package_version: ${{ steps.get_version.outputs.package_version }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.sha }}
+
+      - name: Verify ref is on main
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if ! git merge-base --is-ancestor ${{ github.event.inputs.ref }} origin/main; then
+            echo "Error: ref must be an ancestor of main (i.e., already merged)"
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - name: Setup node
+        uses: buildjet/setup-node@v4
+        with:
+          node-version: 20.20.0
+          cache: "pnpm"
+
+      # npm v11.5.1 or newer is required for OIDC support
+      # https://github.blog/changelog/2025-07-31-npm-trusted-publishing-with-oidc-is-generally-available/#whats-new
+      - name: Setup npm 11.x for OIDC
+        run: npm install -g npm@11.6.4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm run generate
+
+      - name: Build
+        run: pnpm run build --filter "@trigger.dev/*" --filter "trigger.dev"
+
+      - name: Type check
+        run: pnpm run typecheck --filter "@trigger.dev/*" --filter "trigger.dev"
+
+      - name: Publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: pnpm run changeset:release
+          createGithubReleases: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show package version
+        if: steps.changesets.outputs.published == 'true'
+        id: get_version
+        run: |
+          package_version=$(echo '${{ steps.changesets.outputs.publishedPackages }}' | jq -r '.[0].version')
+          echo "package_version=${package_version}" >> "$GITHUB_OUTPUT"
+
+      # this triggers the publish workflow for the docker images
+      - name: Create and push Docker tag
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          set -e
+          git tag "v.docker.${{ steps.get_version.outputs.package_version }}"
+          git push origin "v.docker.${{ steps.get_version.outputs.package_version }}"
+
+  # The prerelease job needs to be on the same workflow file due to a limitation related to how npm verifies OIDC claims.
+  prerelease:
+    name: 🧪 Prerelease
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    if: github.repository == 'triggerdotdev/trigger.dev' && github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'prerelease'
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - name: Setup node
+        uses: buildjet/setup-node@v4
+        with:
+          node-version: 20.20.0
+          cache: "pnpm"
+
+      # npm v11.5.1 or newer is required for OIDC support
+      # https://github.blog/changelog/2025-07-31-npm-trusted-publishing-with-oidc-is-generally-available/#whats-new
+      - name: Setup npm 11.x for OIDC
+        run: npm install -g npm@11.6.4
+
+      - name: Download deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm run generate
+
+      - name: Snapshot version
+        run: pnpm exec changeset version --snapshot ${{ github.event.inputs.prerelease_tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean
+        run: pnpm run clean --filter "@trigger.dev/*" --filter "trigger.dev"
+
+      - name: Build
+        run: pnpm run build --filter "@trigger.dev/*" --filter "trigger.dev"
+
+      - name: Publish prerelease
+        run: pnpm exec changeset publish --no-git-tag --snapshot --tag ${{ github.event.inputs.prerelease_tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

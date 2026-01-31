@@ -1,0 +1,83 @@
+parameters:
+  - name: environment
+    type: string
+  - name: baseUrl
+    type: string
+
+jobs:
+  - job: E2E_${{ upper(parameters.environment) }}
+    displayName: "[${{ upper(parameters.environment) }}] E2E (deployed URL)"
+    timeoutInMinutes: 20
+    container: mcr.microsoft.com/playwright:v1.58.1-noble
+    steps:
+      - checkout: self
+
+      - script: |
+          set -e
+          BUN_VERSION="1.3.8"
+
+          if ! command -v unzip >/dev/null 2>&1; then
+            echo "unzip missing; trying to install"
+            apt-get update && apt-get install -y unzip
+          fi
+
+          CURRENT_BUN_VERSION="$($HOME/.bun/bin/bun --version 2>/dev/null || true)"
+          if [ "$CURRENT_BUN_VERSION" != "$BUN_VERSION" ]; then
+            curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
+          fi
+
+          echo "##vso[task.prependpath]$HOME/.bun/bin"
+          $HOME/.bun/bin/bun --version
+        displayName: "Setup Bun"
+
+      - script: |
+          mkdir -p "$BUN_INSTALL_CACHE_DIR"
+          bun install --frozen-lockfile
+        displayName: "Install dependencies"
+        env:
+          BUN_INSTALL_CACHE_DIR: "/tmp/bun-cache"
+
+      - script: |
+          echo "Running E2E against: $BASE_URL"
+          cd apps/web-app
+          npx playwright test
+        displayName: "Run Playwright E2E"
+        env:
+          CI: "true"
+          BASE_URL: ${{ parameters.baseUrl }}
+          ${{ if eq(parameters.environment, 'prod') }}:
+            E2E_SUITE: prod
+          ${{ else }}:
+            E2E_SUITE: full
+
+      - bash: |
+          TEST_RESULTS_EXISTS="false"
+          PLAYWRIGHT_REPORT_EXISTS="false"
+          if [ -d "$(Build.SourcesDirectory)/apps/web-app/test-results" ]; then
+            TEST_RESULTS_EXISTS="true"
+          fi
+          if [ -d "$(Build.SourcesDirectory)/apps/web-app/playwright-report" ]; then
+            PLAYWRIGHT_REPORT_EXISTS="true"
+          fi
+          echo "##vso[task.setvariable variable=TestResultsExist]$TEST_RESULTS_EXISTS"
+          echo "##vso[task.setvariable variable=PlaywrightReportExist]$PLAYWRIGHT_REPORT_EXISTS"
+        displayName: "Check artifacts existence"
+        condition: succeededOrFailed()
+
+      - task: PublishTestResults@2
+        displayName: "Publish test results"
+        inputs:
+          searchFolder: "$(Build.SourcesDirectory)/apps/web-app/test-results"
+          testResultsFormat: "JUnit"
+          testResultsFiles: "e2e-junit-results.xml"
+          mergeTestResults: true
+          failTaskOnFailedTests: true
+          testRunTitle: "E2E Tests - ${{ parameters.environment }}"
+        condition: and(succeededOrFailed(), eq(variables.TestResultsExist, 'true'))
+
+      - task: PublishPipelineArtifact@1
+        displayName: "Publish Playwright report"
+        inputs:
+          targetPath: "$(Build.SourcesDirectory)/apps/web-app/playwright-report"
+          artifact: "playwright-report-${{ lower(parameters.environment) }}"
+        condition: and(succeededOrFailed(), eq(variables.PlaywrightReportExist, 'true'))

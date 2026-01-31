@@ -1,0 +1,6 @@
+apiVersion: v2
+name: e2e-tests
+description: E2E Playwright tests executed as Kubernetes Job
+type: application
+version: 0.1.0
+appVersion: "0.0.0"

@@ -1,0 +1,13 @@
+{
+  "id": "org-centric-billing",
+  "started": "2025-01-11T18:30:00Z",
+  "lastUpdated": "2025-01-11T18:30:00Z",
+  "status": "active",
+  "phase": "complete",
+  "progress": {
+    "discovery": { "answered": 5, "total": 5 },
+    "detail": { "answered": 5, "total": 5 }
+  },
+  "contextFiles": [],
+  "relatedFeatures": []
+}

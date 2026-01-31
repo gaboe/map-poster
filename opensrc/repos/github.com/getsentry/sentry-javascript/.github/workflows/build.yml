@@ -1,0 +1,1165 @@
+name: 'CI: Build & Test'
+on:
+  push:
+    branches:
+      - develop
+      - master
+      - v9
+      - v8
+      - release/**
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: If the commit you want to test isn't the head of a branch, provide its SHA here
+        required: false
+  schedule:
+    # Run every day at midnight (without cache)
+    - cron: '0 0 * * *'
+
+# Cancel in progress workflows on pull_requests.
+# https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  HEAD_COMMIT: ${{ github.event.inputs.commit || github.sha }}
+
+  # WARNING: this disables cross os caching as ~ and
+  # github.workspace evaluate to differents paths
+  CACHED_DEPENDENCY_PATHS: |
+    ${{ github.workspace }}/node_modules
+    ${{ github.workspace }}/packages/*/node_modules
+    ${{ github.workspace }}/dev-packages/*/node_modules
+    ~/.cache/mongodb-binaries/
+
+  # DEPENDENCY_CACHE_KEY: can't be set here because we don't have access to yarn.lock
+
+  # WARNING: this disables cross os caching as ~ and
+  # github.workspace evaluate to differents paths
+  # packages/utils/cjs and packages/utils/esm: Symlinks to the folders inside of `build`, needed for tests
+  CACHED_BUILD_PATHS: |
+    ${{ github.workspace }}/dev-packages/*/build
+    ${{ github.workspace }}/packages/*/build
+    ${{ github.workspace }}/packages/*/lib
+    ${{ github.workspace }}/packages/ember/*.d.ts
+    ${{ github.workspace }}/packages/gatsby/*.d.ts
+
+  BUILD_CACHE_TARBALL_KEY: tarball-${{ github.event.inputs.commit || github.sha }}
+
+  # GH will use the first restore-key it finds that matches
+  # So it will start by looking for one from the same branch, else take the newest one it can find elsewhere
+  # We want to prefer the cache from the current develop branch, if we don't find any on the current branch
+  NX_CACHE_RESTORE_KEYS: |
+    nx-Linux-${{ github.ref }}-${{ github.event.inputs.commit || github.sha }}
+    nx-Linux-${{ github.ref }}
+    nx-Linux
+
+  # https://bsky.app/profile/joyeecheung.bsky.social/post/3lhy6o54fo22h
+  # Apparently some of our CI failures are attributable to a corrupt v8 cache, causing v8 failures with: "Check failed: current == end_slot_index.".
+  # This option both controls the `v8-compile-cache-lib` and `v8-compile-cache` packages.
+  DISABLE_V8_COMPILE_CACHE: '1'
+
+jobs:
+  job_get_metadata:
+    name: Get Metadata
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check out current commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+          # We need to check out not only the fake merge commit between the PR and the base branch which GH creates, but
+          # also its parents, so that we can pull the commit message from the head commit of the PR
+          fetch-depth: 2
+
+      - name: Get metadata
+        id: get_metadata
+        # We need to try a number of different options for finding the head commit, because each kind of trigger event
+        # stores it in a different location
+        run: |
+          COMMIT_SHA=$(git rev-parse --short ${{ github.event.pull_request.head.sha || github.event.head_commit.id || env.HEAD_COMMIT }})
+          echo "COMMIT_SHA=$COMMIT_SHA" >> $GITHUB_ENV
+          echo "COMMIT_MESSAGE=$(git log -n 1 --pretty=format:%s $COMMIT_SHA)" >> $GITHUB_ENV
+
+      # Most changed packages are determined in job_build via Nx
+      - name: Determine changed packages
+        uses: dorny/paths-filter@v3.0.1
+        id: changed
+        with:
+          filters: |
+            workflow:
+              - '.github/**'
+            any_code:
+              - '!**/*.md'
+
+      - name: Get PR labels
+        id: pr-labels
+        uses: mydea/pr-labels-action@fn/bump-node20
+
+    outputs:
+      commit_label: '${{ env.COMMIT_SHA }}: ${{ env.COMMIT_MESSAGE }}'
+      # Note: These next three have to be checked as strings ('true'/'false')!
+      is_base_branch:
+        ${{ github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/v9' || github.ref == 'refs/heads/v8'}}
+      is_release: ${{ startsWith(github.ref, 'refs/heads/release/') }}
+      changed_ci: ${{ steps.changed.outputs.workflow == 'true' }}
+      changed_any_code: ${{ steps.changed.outputs.any_code == 'true' }}
+
+      # When merging into master, or from master
+      is_gitflow_sync: ${{ github.head_ref == 'master' || github.ref == 'refs/heads/master' }}
+      has_gitflow_label:
+        ${{ github.event_name == 'pull_request' && contains(steps.pr-labels.outputs.labels, ' Gitflow ') }}
+      force_skip_cache:
+        ${{ github.event_name == 'schedule' || (github.event_name == 'pull_request' &&
+        contains(steps.pr-labels.outputs.labels, ' ci-skip-cache ')) }}
+
+  job_build:
+    name: Build
+    needs: job_get_metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    if: |
+      needs.job_get_metadata.outputs.changed_any_code == 'true' ||
+      needs.job_get_metadata.outputs.is_base_branch == 'true' ||
+      needs.job_get_metadata.outputs.is_release == 'true' ||
+      (needs.job_get_metadata.outputs.is_gitflow_sync == 'false' && needs.job_get_metadata.outputs.has_gitflow_label == 'false' && needs.job_get_metadata.outputs.changed_any_code == 'true')
+    steps:
+      - name: Check out base commit (${{ github.event.pull_request.base.sha }})
+        uses: actions/checkout@v6
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: 'Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+
+      - name: Install Dependencies
+        uses: ./.github/actions/install-dependencies
+        id: install_dependencies
+
+      - name: Check for Affected Nx Projects
+        uses: dkhunt27/action-nx-affected-list@v6.1
+        id: checkForAffected
+        if: github.event_name == 'pull_request'
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ env.HEAD_COMMIT }}
+
+      - name: NX cache
+        uses: actions/cache@v5
+        # Disable cache when:
+        # - on release branches
+        # - when PR has `ci-skip-cache` label or on nightly builds
+        if: |
+          needs.job_get_metadata.outputs.is_release == 'false' &&
+          needs.job_get_metadata.outputs.force_skip_cache == 'false'
+        with:
+          path: .nxcache
+          key: nx-Linux-${{ github.ref }}-${{ env.HEAD_COMMIT || github.sha }}
+          # On develop branch, we want to _store_ the cache (so it can be used by other branches), but never _restore_ from it
+          restore-keys:
+            ${{needs.job_get_metadata.outputs.is_base_branch == 'false' && env.NX_CACHE_RESTORE_KEYS ||
+            'nx-never-restore'}}
+
+      - name: Build packages
+        run: yarn build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: build-output
+          path: ${{ env.CACHED_BUILD_PATHS }}
+          retention-days: 4
+          compression-level: 6
+          overwrite: true
+
+    outputs:
+      dependency_cache_key: ${{ steps.install_dependencies.outputs.cache_key }}
+      changed_node_integration:
+        ${{ needs.job_get_metadata.outputs.changed_ci == 'true' || contains(steps.checkForAffected.outputs.affected,
+        '@sentry-internal/node-integration-tests') }}
+      changed_remix:
+        ${{ needs.job_get_metadata.outputs.changed_ci == 'true' || contains(steps.checkForAffected.outputs.affected,
+        '@sentry/remix') }}
+      changed_node:
+        ${{ needs.job_get_metadata.outputs.changed_ci == 'true' || contains(steps.checkForAffected.outputs.affected,
+        '@sentry/node') }}
+      changed_node_overhead_action:
+        ${{ needs.job_get_metadata.outputs.changed_ci == 'true' || contains(steps.checkForAffected.outputs.affected,
+        '@sentry-internal/node-overhead-gh-action') }}
+      changed_deno:
+        ${{ needs.job_get_metadata.outputs.changed_ci == 'true' || contains(steps.checkForAffected.outputs.affected,
+        '@sentry/deno') }}
+      changed_bun:
+        ${{ needs.job_get_metadata.outputs.changed_ci == 'true' || contains(steps.checkForAffected.outputs.affected,
+        '@sentry/bun') }}
+      changed_browser_integration:
+        ${{ needs.job_get_metadata.outputs.changed_ci == 'true' || contains(steps.checkForAffected.outputs.affected,
+        '@sentry-internal/browser-integration-tests') }}
+
+  job_check_branches:
+    name: Check PR branches
+    needs: job_get_metadata
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: PR is opened against master
+        uses: mshick/add-pr-comment@dd126dd8c253650d181ad9538d8b4fa218fc31e8
+        if: ${{ github.base_ref == 'master' && !startsWith(github.head_ref, 'prepare-release/') }}
+        with:
+          message: |
+            ⚠️ This PR is opened against **master**. You probably want to open it against **develop**.
+
+  job_size_check:
+    name: Size Check
+    needs: [job_get_metadata, job_build]
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    if:
+      github.event_name == 'pull_request' || needs.job_get_metadata.outputs.is_base_branch == 'true' ||
+      needs.job_get_metadata.outputs.is_release == 'true'
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+      - name: Check bundle sizes
+        uses: ./dev-packages/size-limit-gh-action
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Only run comparison against develop if this is a PR
+          comparison_branch: ${{ (github.event_name == 'pull_request' && github.base_ref) ||  ''}}
+
+  job_node_overhead_check:
+    name: Node Overhead Check
+    needs: [job_get_metadata, job_build]
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    if:
+      (needs.job_build.outputs.changed_node == 'true' && github.event_name == 'pull_request') ||
+      (needs.job_build.outputs.changed_node_overhead_action == 'true' && github.event_name == 'pull_request') ||
+      needs.job_get_metadata.outputs.is_base_branch == 'true' || needs.job_get_metadata.outputs.is_release == 'true'
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+      - name: Check node overhead
+        uses: ./dev-packages/node-overhead-gh-action
+        env:
+          DEBUG: '1'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Only run comparison against develop if this is a PR
+          comparison_branch: ${{ (github.event_name == 'pull_request' && github.base_ref) ||  ''}}
+
+  job_lint:
+    name: Lint
+    # Even though the linter only checks source code, not built code, it needs the built code in order check that all
+    # inter-package dependencies resolve cleanly.
+    needs: [job_get_metadata, job_build]
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+      - name: Check for duplicate dependencies in lockfile
+        # Run `yarn dedupe-deps:fix` locally to resolve any duplicates.
+        run: yarn dedupe-deps:check
+      - name: Lint source files
+        run: yarn lint:lerna
+      - name: Lint for ES compatibility
+        run: yarn lint:es-compatibility
+
+      - name: Check that yarn.lock is stable
+        run: yarn && git diff --exit-code yarn.lock
+
+  job_check_format:
+    name: Check file formatting
+    needs: [job_get_metadata]
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+
+      - name: Install Dependencies
+        uses: ./.github/actions/install-dependencies
+        id: install_dependencies
+
+      - name: Check file formatting
+        run: yarn lint:prettier
+
+  job_circular_dep_check:
+    name: Circular Dependency Check
+    needs: [job_get_metadata, job_build]
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+      - name: Run madge
+        run: yarn circularDepCheck
+
+  job_artifacts:
+    name: Upload Artifacts
+    needs: [job_get_metadata, job_build]
+    runs-on: ubuntu-24.04
+    # Build artifacts are only needed for releasing workflow.
+    if: needs.job_get_metadata.outputs.is_release == 'true'
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+
+      - name: Pack tarballs
+        run: yarn build:tarball
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ github.sha }}
+          retention-days: 90
+          path: |
+            ${{ github.workspace }}/packages/browser/build/bundles/**
+            ${{ github.workspace }}/packages/replay-internal/build/bundles/**
+            ${{ github.workspace }}/packages/replay-canvas/build/bundles/**
+            ${{ github.workspace }}/packages/feedback/build/bundles/**
+            ${{ github.workspace }}/packages/**/*.tgz
+            ${{ github.workspace }}/packages/aws-serverless/build/aws/dist-serverless/*.zip
+
+  job_browser_unit_tests:
+    name: Browser Unit Tests
+    needs: [job_get_metadata, job_build]
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out base commit (${{ github.event.pull_request.base.sha }})
+        uses: actions/checkout@v6
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+
+      - name: Run affected tests
+        run: yarn test:pr:browser --base=${{ github.event.pull_request.base.sha }}
+        if: github.event_name == 'pull_request'
+
+      - name: Run all tests
+        run: yarn test:ci:browser
+        if: github.event_name != 'pull_request'
+
+      - name: Parse and Upload Coverage
+        if: cancelled() == false
+        continue-on-error: true
+        uses: getsentry/codecov-action@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  job_bun_unit_tests:
+    name: Bun Unit Tests
+    needs: [job_get_metadata, job_build]
+    if: needs.job_build.outputs.changed_bun == 'true' || github.event_name != 'pull_request'
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+      - name: Run tests
+        run: |
+          yarn test:ci:bun
+
+  job_deno_unit_tests:
+    name: Deno Unit Tests
+    needs: [job_get_metadata, job_build]
+    if: needs.job_build.outputs.changed_deno == 'true' || github.event_name != 'pull_request'
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2.0.3
+        with:
+          deno-version: v2.1.5
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+      - name: Run tests
+        run: |
+          cd packages/deno
+          yarn build
+          yarn test
+
+  job_node_unit_tests:
+    name: Node (${{ matrix.node }}) Unit Tests
+    needs: [job_get_metadata, job_build]
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22, 24]
+    steps:
+      - name: Check out base commit (${{ github.event.pull_request.base.sha }})
+        uses: actions/checkout@v6
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+
+      - name: Run affected tests
+        run: yarn test:pr:node --base=${{ github.event.pull_request.base.sha }}
+        if: github.event_name == 'pull_request'
+        env:
+          NODE_VERSION: ${{ matrix.node }}
+
+      - name: Run all tests
+        run: yarn test:ci:node
+        if: github.event_name != 'pull_request'
+        env:
+          NODE_VERSION: ${{ matrix.node }}
+
+      - name: Parse and Upload Coverage
+        if: cancelled() == false
+        continue-on-error: true
+        uses: getsentry/codecov-action@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  job_browser_playwright_tests:
+    name:
+      Playwright ${{ matrix.bundle }}${{ matrix.project && matrix.project != 'chromium' && format(' {0}',
+      matrix.project) || ''}}${{ matrix.shard && format(' ({0}/{1})', matrix.shard, matrix.shards) || ''}} Tests
+    needs: [job_get_metadata, job_build]
+    if: needs.job_build.outputs.changed_browser_integration == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04-large-js
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        bundle:
+          - esm
+          - bundle
+          - bundle_min
+          - bundle_logs_metrics
+          - bundle_replay
+          - bundle_replay_logs_metrics
+          - bundle_tracing
+          - bundle_tracing_logs_metrics
+          - bundle_tracing_replay
+          - bundle_tracing_replay_logs_metrics
+          - bundle_tracing_replay_feedback
+          - bundle_tracing_replay_feedback_logs_metrics
+          - bundle_tracing_replay_feedback_logs_metrics_min
+        project:
+          - chromium
+        include:
+          # Only check all projects for full bundle
+          # We also shard the tests as they take the longest
+          - bundle: bundle_tracing_replay_feedback_logs_metrics_min
+            project: 'webkit'
+          - bundle: bundle_tracing_replay_feedback_logs_metrics_min
+            project: 'firefox'
+          - bundle: esm
+            project: chromium
+            shard: 1
+            shards: 4
+          - bundle: esm
+            project: chromium
+            shard: 2
+            shards: 4
+          - bundle: esm
+            project: chromium
+            shard: 3
+            shards: 4
+          - bundle: esm
+            project: chromium
+            shard: 4
+            shards: 4
+        exclude:
+          # Do not run the un-sharded esm tests
+          - bundle: esm
+            project: 'chromium'
+
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+
+      - name: Install Playwright
+        uses: ./.github/actions/install-playwright
+        with:
+          browsers: ${{ matrix.project }}
+
+      - name: Run Playwright tests
+        env:
+          PW_BUNDLE: ${{ matrix.bundle }}
+        working-directory: dev-packages/browser-integration-tests
+        run:
+          yarn test:all${{ matrix.project && format(' --project={0}', matrix.project) || '' }}${{ matrix.shard &&
+          format(' --shard={0}/{1}', matrix.shard, matrix.shards) || '' }}
+
+      - name: Upload Playwright Traces
+        uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name:
+            playwright-traces-job_browser_playwright_tests-${{ matrix.bundle}}-${{matrix.project}}-${{matrix.shard ||
+            '0'}}
+          path: dev-packages/browser-integration-tests/test-results
+          overwrite: true
+          retention-days: 7
+
+      - name: Parse and Upload Coverage
+        if: cancelled() == false
+        continue-on-error: true
+        uses: getsentry/codecov-action@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          directory: dev-packages/browser-integration-tests
+
+  job_browser_loader_tests:
+    name: PW ${{ matrix.bundle }} Tests
+    needs: [job_get_metadata, job_build]
+    if: needs.job_build.outputs.changed_browser_integration == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        bundle:
+          - loader_base
+          - loader_eager
+          - loader_debug
+          - loader_tracing
+          - loader_replay
+          - loader_replay_buffer
+          - loader_tracing_replay
+
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+
+      - name: Install Playwright
+        uses: ./.github/actions/install-playwright
+        with:
+          browsers: chromium
+
+      - name: Run Playwright Loader tests
+        env:
+          PW_BUNDLE: ${{ matrix.bundle }}
+        run: |
+          cd dev-packages/browser-integration-tests
+          yarn test:loader
+
+      - name: Upload Playwright Traces
+        uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: playwright-traces-job_browser_loader_tests-${{ matrix.bundle}}
+          path: dev-packages/browser-integration-tests/test-results
+          overwrite: true
+          retention-days: 7
+
+      - name: Parse and Upload Coverage
+        uses: getsentry/codecov-action@main
+        if: cancelled() == false
+        continue-on-error: true
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          directory: dev-packages/browser-integration-tests
+
+  job_check_for_faulty_dts:
+    name: Check for faulty .d.ts files
+    needs: [job_get_metadata, job_build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+      - name: Check for dts files that reference stuff in the temporary build folder
+        run: |
+          if grep -r --include "*.d.ts" --exclude-dir ".nxcache" 'import("@sentry(-internal)?/[^/]*/build' .; then
+            echo "Found illegal TypeScript import statement."
+            exit 1
+          fi
+
+  job_node_integration_tests:
+    name:
+      Node (${{ matrix.node }})${{ (matrix.typescript && format(' (TS {0})', matrix.typescript)) || '' }} Integration
+      Tests
+    needs: [job_get_metadata, job_build]
+    if: needs.job_build.outputs.changed_node_integration == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22, 24]
+        typescript:
+          - false
+        include:
+          # Only check typescript for latest version (to streamline CI)
+          - node: 24
+            typescript: '3.8'
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+
+      - name: Overwrite typescript version
+        if: matrix.typescript == '3.8'
+        run: node ./scripts/use-ts-3_8.js
+        working-directory: dev-packages/node-integration-tests
+
+      - name: Run integration tests
+        working-directory: dev-packages/node-integration-tests
+        run: yarn test
+
+      - name: Parse and Upload Coverage
+        if: cancelled() == false
+        continue-on-error: true
+        uses: getsentry/codecov-action@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          directory: dev-packages/node-integration-tests
+
+  job_cloudflare_integration_tests:
+    name: Cloudflare Integration Tests
+    needs: [job_get_metadata, job_build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+
+      - name: Run integration tests
+        working-directory: dev-packages/cloudflare-integration-tests
+        run: yarn test
+
+  job_remix_integration_tests:
+    name: Remix (Node ${{ matrix.node }}) Tests
+    needs: [job_get_metadata, job_build]
+    if: needs.job_build.outputs.changed_remix == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22, 24]
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+
+      - name: Install Playwright
+        uses: ./.github/actions/install-playwright
+        with:
+          browsers: chromium
+
+      - name: Run integration tests
+        env:
+          NODE_VERSION: ${{ matrix.node }}
+        run: |
+          cd packages/remix
+          yarn test:integration:ci
+
+      - name: Parse and Upload Coverage
+        if: cancelled() == false
+        continue-on-error: true
+        uses: getsentry/codecov-action@main
+        with:
+          directory: packages/remix
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  job_e2e_prepare:
+    name: Prepare E2E tests
+    # We want to run this if:
+    # - The build job was successful, not skipped
+    if: |
+      always() &&
+      needs.job_build.result == 'success'
+    needs: [job_get_metadata, job_build]
+    runs-on: ubuntu-24.04-large-js
+    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      matrix-optional: ${{ steps.matrix-optional.outputs.matrix }}
+    steps:
+      - name: Check out base commit (${{ github.event.pull_request.base.sha }})
+        uses: actions/checkout@v6
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+      - name: NX cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .nxcache
+          key: nx-Linux-${{ github.ref }}-${{ env.HEAD_COMMIT }}
+          # On develop branch, we want to _store_ the cache (so it can be used by other branches), but never _restore_ from it
+          restore-keys: ${{ env.NX_CACHE_RESTORE_KEYS }}
+
+      - name: Build tarballs
+        run: yarn build:tarball
+
+      - name: Stores tarballs in cache
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ github.workspace }}/packages/*/*.tgz
+          key: ${{ env.BUILD_CACHE_TARBALL_KEY }}
+
+      - name: Determine which E2E test applications should be run
+        id: matrix
+        run:
+          yarn --silent ci:build-matrix --base=${{ (github.event_name == 'pull_request' &&
+          github.event.pull_request.base.sha) || '' }} >> $GITHUB_OUTPUT
+        working-directory: dev-packages/e2e-tests
+
+      - name: Determine which optional E2E test applications should be run
+        id: matrix-optional
+        run:
+          yarn --silent ci:build-matrix-optional --base=${{ (github.event_name == 'pull_request' &&
+          github.event.pull_request.base.sha) || '' }} >> $GITHUB_OUTPUT
+        working-directory: dev-packages/e2e-tests
+
+  job_e2e_tests:
+    name: E2E ${{ matrix.label || matrix.test-application }} Test
+    # We need to add the `always()` check here because the previous step has this as well :(
+    # See: https://github.com/actions/runner/issues/2205
+    if:
+      always() && needs.job_e2e_prepare.result == 'success' && needs.job_e2e_prepare.outputs.matrix != '{"include":[]}'
+    needs: [job_get_metadata, job_build, job_e2e_prepare]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # We just use a dummy DSN here, only send to the tunnel anyhow
+      E2E_TEST_DSN: 'https://username@domain/123'
+      # Needed because some apps expect a certain prefix
+      NEXT_PUBLIC_E2E_TEST_DSN: 'https://username@domain/123'
+      PUBLIC_E2E_TEST_DSN: 'https://username@domain/123'
+      REACT_APP_E2E_TEST_DSN: 'https://username@domain/123'
+      E2E_TEST_SENTRY_ORG_SLUG: 'sentry-javascript-sdks'
+      E2E_TEST_SENTRY_PROJECT: 'sentry-javascript-e2e-tests'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.job_e2e_prepare.outputs.matrix) }}
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'dev-packages/e2e-tests/test-applications/${{ matrix.test-application }}/package.json'
+      - name: Set up Bun
+        if: matrix.test-application == 'node-exports-test-app'
+        uses: oven-sh/setup-bun@v2
+      - name: Set up AWS SAM
+        if: matrix.test-application == 'aws-serverless'
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+
+      - name: Restore tarball cache
+        uses: actions/cache/restore@v5
+        id: restore-tarball-cache
+        with:
+          path: ${{ github.workspace }}/packages/*/*.tgz
+          key: ${{ env.BUILD_CACHE_TARBALL_KEY }}
+
+      - name: Build tarballs if not cached
+        if: steps.restore-tarball-cache.outputs.cache-hit != 'true'
+        run: yarn build:tarball
+
+      - name: Get node version
+        id: versions
+        run: |
+          echo "echo node=$(jq -r '.volta.node' dev-packages/e2e-tests/package.json)" >> $GITHUB_OUTPUT
+
+      - name: Validate Verdaccio
+        run: yarn test:validate
+        working-directory: dev-packages/e2e-tests
+
+      - name: Prepare Verdaccio
+        run: yarn test:prepare
+        working-directory: dev-packages/e2e-tests
+        env:
+          E2E_TEST_PUBLISH_SCRIPT_NODE_VERSION: ${{ steps.versions.outputs.node }}
+
+      - name: Copy to temp
+        run: yarn ci:copy-to-temp ./test-applications/${{ matrix.test-application }} ${{ runner.temp }}/test-application
+        working-directory: dev-packages/e2e-tests
+
+      - name: Build E2E app
+        working-directory: ${{ runner.temp }}/test-application
+        timeout-minutes: 7
+        run: ${{ matrix.build-command || 'pnpm test:build' }}
+        env:
+          SENTRY_E2E_WORKSPACE_ROOT: ${{ github.workspace }}
+
+      - name: Install Playwright
+        uses: ./.github/actions/install-playwright
+        with:
+          browsers: chromium
+          cwd: ${{ runner.temp }}/test-application
+
+      - name: Run E2E test
+        working-directory: ${{ runner.temp }}/test-application
+        timeout-minutes: 10
+        run: ${{ matrix.assert-command || 'pnpm test:assert' }}
+        env:
+          SENTRY_E2E_WORKSPACE_ROOT: ${{ github.workspace }}
+
+      - name: Upload Playwright Traces
+        uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: playwright-traces-job_e2e_playwright_tests-${{ matrix.test-application}}
+          path: ${{ runner.temp }}/test-application/test-results
+          overwrite: true
+          retention-days: 7
+
+      - name: Pre-process E2E Test Dumps
+        if: failure()
+        run: |
+          node ./scripts/normalize-e2e-test-dump-transaction-events.js
+
+      - name: Upload E2E Test Event Dumps
+        uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: E2E Test Dump (${{ matrix.label || matrix.test-application }})
+          path: ${{ runner.temp }}/test-application/event-dumps
+          overwrite: true
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Parse and Upload Coverage
+        if: cancelled() == false
+        continue-on-error: true
+        uses: getsentry/codecov-action@main
+        with:
+          directory: dev-packages/e2e-tests
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # - We skip optional tests on release branches
+  job_optional_e2e_tests:
+    name: E2E ${{ matrix.label || matrix.test-application }} Test (optional)
+    # We only run E2E tests for non-fork PRs because the E2E tests require secrets to work and they can't be accessed from forks
+    # We need to add the `always()` check here because the previous step has this as well :(
+    # See: https://github.com/actions/runner/issues/2205
+    if:
+      always() && needs.job_get_metadata.outputs.is_release != 'true' && needs.job_e2e_prepare.result == 'success' &&
+      needs.job_e2e_prepare.outputs.matrix-optional != '{"include":[]}' && (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
+    needs: [job_get_metadata, job_build, job_e2e_prepare]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      E2E_TEST_AUTH_TOKEN: ${{ secrets.E2E_TEST_AUTH_TOKEN }}
+      E2E_TEST_DSN: ${{ secrets.E2E_TEST_DSN }}
+      # Needed because some apps expect a certain prefix
+      NEXT_PUBLIC_E2E_TEST_DSN: ${{ secrets.E2E_TEST_DSN }}
+      PUBLIC_E2E_TEST_DSN: ${{ secrets.E2E_TEST_DSN }}
+      REACT_APP_E2E_TEST_DSN: ${{ secrets.E2E_TEST_DSN }}
+      E2E_TEST_SENTRY_ORG_SLUG: 'sentry-javascript-sdks'
+      E2E_TEST_SENTRY_PROJECT: 'sentry-javascript-e2e-tests'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.job_e2e_prepare.outputs.matrix-optional) }}
+
+    steps:
+      - name: Check out current commit (${{ needs.job_get_metadata.outputs.commit_label }})
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.HEAD_COMMIT }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: 'dev-packages/e2e-tests/test-applications/${{ matrix.test-application }}/package.json'
+      - name: Restore caches
+        uses: ./.github/actions/restore-cache
+        with:
+          dependency_cache_key: ${{ needs.job_build.outputs.dependency_cache_key }}
+
+      - name: Restore tarball cache
+        uses: actions/cache/restore@v5
+        id: restore-tarball-cache
+        with:
+          path: ${{ github.workspace }}/packages/*/*.tgz
+          key: ${{ env.BUILD_CACHE_TARBALL_KEY }}
+
+      - name: Build tarballs if not cached
+        if: steps.restore-tarball-cache.outputs.cache-hit != 'true'
+        run: yarn build:tarball
+
+      - name: Get node version
+        id: versions
+        run: |
+          echo "echo node=$(jq -r '.volta.node' dev-packages/e2e-tests/package.json)" >> $GITHUB_OUTPUT
+
+      - name: Validate Verdaccio
+        run: yarn test:validate
+        working-directory: dev-packages/e2e-tests
+
+      - name: Prepare Verdaccio
+        run: yarn test:prepare
+        working-directory: dev-packages/e2e-tests
+        env:
+          E2E_TEST_PUBLISH_SCRIPT_NODE_VERSION: ${{ steps.versions.outputs.node }}
+
+      - name: Copy to temp
+        run: yarn ci:copy-to-temp ./test-applications/${{ matrix.test-application }} ${{ runner.temp }}/test-application
+        working-directory: dev-packages/e2e-tests
+
+      - name: Build E2E app
+        working-directory: ${{ runner.temp }}/test-application
+        timeout-minutes: 7
+        run: ${{ matrix.build-command || 'pnpm test:build' }}
+
+      - name: Install Playwright
+        uses: ./.github/actions/install-playwright
+        with:
+          browsers: chromium
+          cwd: ${{ runner.temp }}/test-application
+
+      - name: Run E2E test
+        working-directory: ${{ runner.temp }}/test-application
+        timeout-minutes: 10
+        run: ${{ matrix.assert-command || 'pnpm test:assert' }}
+
+      - name: Pre-process E2E Test Dumps
+        if: failure()
+        run: |
+          node ./scripts/normalize-e2e-test-dump-transaction-events.js
+
+      - name: Upload E2E Test Event Dumps
+        uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: E2E Test Dump (${{ matrix.label || matrix.test-application }})
+          path: ${{ runner.temp }}/test-application/event-dumps
+          overwrite: true
+          retention-days: 7
+          if-no-files-found: ignore
+
+  job_required_jobs_passed:
+    name: All required jobs passed or were skipped
+    needs:
+      [
+        job_build,
+        job_browser_unit_tests,
+        job_bun_unit_tests,
+        job_deno_unit_tests,
+        job_node_unit_tests,
+        job_node_integration_tests,
+        job_cloudflare_integration_tests,
+        job_browser_playwright_tests,
+        job_browser_loader_tests,
+        job_remix_integration_tests,
+        job_e2e_tests,
+        job_artifacts,
+        job_lint,
+        job_check_format,
+        job_circular_dep_check,
+        job_size_check,
+      ]
+    # Always run this, even if a dependent job failed
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check for failures
+        if: cancelled() || contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1

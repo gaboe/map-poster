@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "blogic-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "blogic-cz/blogic-marketplace"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "agent-kit@blogic-marketplace": true
+  }
+}

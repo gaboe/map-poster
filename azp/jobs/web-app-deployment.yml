@@ -1,0 +1,139 @@
+parameters:
+  - name: environment
+    type: string
+  - name: namespace
+    type: string
+  - name: tag
+    type: string
+  - name: imageRepository
+    type: string
+  - name: baseRepository
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: deploymentTarget
+    type: string
+    values:
+      - azure
+      - cloudfleet
+
+jobs:
+  - deployment: DEPLOY_MAP_POSTER_WEB_APP_${{ upper(parameters.environment) }}
+    environment: MAP-POSTER-${{ upper(parameters.environment) }}
+    displayName: "Release Web App to MAP-POSTER-${{ upper(parameters.environment) }}"
+    workspace:
+      clean: all
+    variables:
+      - name: namespace
+        value: ${{ parameters.namespace }}
+      - name: environment
+        value: ${{ parameters.environment }}
+      - name: artifactBaseDirectory
+        value: "$(Pipeline.Workspace)/drop"
+      - name: chartPath
+        value: "$(artifactBaseDirectory)/web-app"
+      - name: valuesFilePath
+        value: "$(artifactBaseDirectory)/web-app/values.${{ parameters.environment }}.yaml"
+      - name: secretName
+        value: "web-app-secrets"
+      - name: helmOverrides
+        ${{ if eq(parameters.deploymentTarget, 'cloudfleet') }}:
+          value: |
+            image.tag=${{ parameters.tag }}
+            hooks.preInstall.image.tag=${{ parameters.tag }}
+            hooks.postInstall.image.tag=${{ parameters.tag }}
+            imagePullSecrets[0].name=acr-secret
+        ${{ else }}:
+          value: |
+            image.tag=${{ parameters.tag }}
+            hooks.preInstall.image.tag=${{ parameters.tag }}
+            hooks.postInstall.image.tag=${{ parameters.tag }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - task: Kubernetes@1
+              inputs:
+                connectionType: "Kubernetes Service Connection"
+                kubernetesServiceEndpoint: "${{ parameters.serviceConnection }}"
+                command: "login"
+              displayName: "Login to Kubernetes cluster"
+            - powershell: |
+                $secretArgs = @(
+                  "--from-literal=BETTER_AUTH_SECRET=$(BETTER_AUTH_SECRET)"
+                  "--from-literal=BREVO_API_KEY=$(BREVO_API_KEY)"
+                  "--from-literal=DATABASE_URL=$(DATABASE_URL)"
+                  "--from-literal=GITHUB_CLIENT_SECRET=$(GITHUB_CLIENT_SECRET)"
+                  "--from-literal=GOOGLE_CLIENT_SECRET=$(GOOGLE_CLIENT_SECRET)"
+                  "--from-literal=SENTRY_DSN=$(SENTRY_DSN)"
+                )
+                kubectl create namespace $(namespace) --dry-run=client -o yaml | kubectl apply -f -
+                kubectl delete -n $(namespace) secret $(secretName) --ignore-not-found
+                kubectl create secret generic $(secretName) -n $(namespace) @secretArgs
+              displayName: "Create/Update Web app secret"
+            - task: HelmInstaller@1
+              inputs:
+                helmVersionToInstall: "3.18.6"
+              displayName: Install Helm
+            - ${{ if eq(parameters.deploymentTarget, 'cloudfleet') }}:
+              - bash: |
+                  kubectl create namespace $(namespace) --dry-run=client -o yaml | kubectl apply -f -
+                  kubectl create secret docker-registry acr-secret --namespace $(namespace) --docker-server=blogicapps2-fgbjaff4hhdzcga7.azurecr.io --docker-username=blogicapps2 --docker-password="$ACR_PASSWORD" --dry-run=client -o yaml | kubectl apply -f -
+                displayName: "Prepare namespace and docker-registry secret for CloudFleet"
+                env:
+                  ACR_PASSWORD: $(ACR_PASSWORD)
+            - task: HelmDeploy@1
+              inputs:
+                connectionType: "Kubernetes Service Connection"
+                kubernetesServiceConnection: "${{ parameters.serviceConnection }}"
+                namespace: "$(namespace)"
+                command: "upgrade"
+                chartType: "FilePath"
+                chartPath: "$(chartPath)"
+                releaseName: "web-app"
+                overrideValues: $(helmOverrides)
+                valueFile: "$(valuesFilePath)"
+                arguments: "--wait --timeout 3m"
+                debug: true
+              displayName: "Deploy Web App"
+            # Notify Sentry of deployment (release already exists from Docker build)
+            - bash: |
+                RELEASE="${{ parameters.baseRepository }}-${{ parameters.tag }}"
+                ENVIRONMENT="$(environment)"
+
+                echo "🚀 Notifying Sentry of deployment: $RELEASE to $ENVIRONMENT"
+
+                # Create deploy record (release already exists from Docker build)
+                DEPLOY_RESPONSE=$(curl -sS -w "\n%{http_code}" \
+                  "https://sentry.io/api/0/organizations/blogic-sro/releases/$RELEASE/deploys/" \
+                  -H "Authorization: Bearer $(SENTRY_AUTH_TOKEN)" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"environment\": \"$ENVIRONMENT\"}")
+
+                DEPLOY_HTTP_CODE=$(echo "$DEPLOY_RESPONSE" | tail -n1)
+
+                if [[ "$DEPLOY_HTTP_CODE" =~ ^2 ]]; then
+                  echo "✅ Deploy recorded successfully"
+                else
+                  echo "⚠️  Failed to record deploy (HTTP $DEPLOY_HTTP_CODE) - non-blocking"
+                  echo "$DEPLOY_RESPONSE" | head -n -1
+                fi
+
+                # Finalize release (set dateReleased to mark as "released")
+                FINALIZE_RESPONSE=$(curl -sS -w "\n%{http_code}" -X PUT \
+                  "https://sentry.io/api/0/organizations/blogic-sro/releases/$RELEASE/" \
+                  -H "Authorization: Bearer $(SENTRY_AUTH_TOKEN)" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"dateReleased\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}")
+
+                FINALIZE_HTTP_CODE=$(echo "$FINALIZE_RESPONSE" | tail -n1)
+
+                if [[ "$FINALIZE_HTTP_CODE" =~ ^2 ]]; then
+                  echo "✅ Release finalized"
+                else
+                  echo "⚠️  Failed to finalize release (HTTP $FINALIZE_HTTP_CODE) - non-blocking"
+                fi
+
+                echo "📊 View: https://sentry.io/organizations/blogic-sro/releases/$RELEASE/"
+              displayName: "Notify Sentry of deployment"
+              continueOnError: true

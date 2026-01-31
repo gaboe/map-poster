@@ -1,0 +1,102 @@
+{
+  "name": "map-poster",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Blogic Template",
+  "keywords": [
+    "blogic",
+    "monorepo",
+    "template",
+    "typescript"
+  ],
+  "author": "",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "jobs/*"
+  ],
+  "scripts": {
+    "ck:warmup": "bun run scripts/warmup-ck.ts",
+    "build": "bun run --filter \"@map-poster/web-app\" build",
+    "build:web-app": "bun run --filter \"@map-poster/web-app\" build",
+    "check": "bun check.ts",
+    "check:ci": "bun check.ts ci",
+    "check:effect": "bun check.ts effect",
+    "clean:branches": "git fetch --prune && git branch --merged main | grep -v '\\*\\|main\\|prod\\|test' | xargs -n 1 git branch -d",
+    "clean:branches:force": "git fetch --prune && git for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads | awk '$2 == \"[gone]\" {print $1}' | grep -v '\\*\\|main\\|prod\\|test' | xargs -n 1 git branch -D",
+    "clean:packages": "find . -path \"./node_modules\" -prune -o -name \"node_modules\" -type d -exec rm -rf {} + 2>/dev/null || true && rm -f bun.lock && bun pm cache rm && find . -path ./node_modules -prune -o -name \"*.tsbuildinfo\" -type f -print | grep -v node_modules | xargs rm -f",
+    "db:generate": "cd packages/db && bun run db:generate",
+    "db:migrate": "cd packages/db && bun db:migrate",
+    "db:studio": "cd packages/db && bun db:studio",
+    "db:visualize": "cd packages/db && bun db:visualize",
+    "post-deployment": "cd jobs/post-deployment && bun run start",
+    "pre-deployment": "cd jobs/pre-deployment && bun run start",
+    "dev": "bun run ck:warmup & cd apps/web-app && bun run dev",
+    "dev:web-app": "cd apps/web-app && bun run dev",
+    "test": "vitest run --reporter=dot --silent",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "bun run --filter \"@map-poster/web-app\" test:e2e",
+    "test:e2e:install": "bun run --filter \"@map-poster/web-app\" test:e2e:install",
+    "test:e2e:ui": "bun run --filter \"@map-poster/web-app\" test:e2e:ui",
+    "test:watch": "vitest",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint -c ./.oxlintrc.json --deny-warnings",
+    "lint:fix": "oxlint -c ./.oxlintrc.json --fix",
+    "lint:type-aware": "oxlint -c ./.oxlintrc.json --type-aware --deny-warnings",
+    "lint:type-aware:fix": "oxlint -c ./.oxlintrc.json --type-aware --fix --fix-suggestions --deny-warnings",
+    "opensrc:sync": "bun run scripts/opensrc-sync.ts",
+    "opensrc:use": "bunx opensrc --modify false",
+    "typecheck": "bun check.ts typecheck",
+    "typecheck:verbose": "bun check.ts typecheck --verbose",
+    "update:packages": "bun update -i -r",
+    "prepare": "effect-language-service patch && if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then lefthook install; else echo 'Skipping lefthook install (git repo not available)'; fi"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "0.5.2",
+    "@changesets/cli": "2.29.8",
+    "@effect/language-service": "0.72.0",
+    "@effect/vitest": "0.27.0",
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "7.0.0-dev.20260131.1",
+    "@vitest/coverage-istanbul": "4.0.18",
+    "lefthook": "2.0.16",
+    "oxfmt": "0.27.0",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "0.11.4",
+    "typescript": "catalog:",
+    "vitest": "4.0.18"
+  },
+  "packageManager": "bun@1.3.8",
+  "catalog": {
+    "@electric-sql/pglite": "0.3.15",
+    "@paralleldrive/cuid2": "3.3.0",
+    "@playwright/test": "1.58.1",
+    "@types/bun": "1.3.8",
+    "@types/node": "25.1.0",
+    "@types/pg": "8.16.0",
+    "better-auth": "1.4.18",
+    "drizzle-kit": "0.31.8",
+    "drizzle-orm": "0.45.1",
+    "effect": "3.19.15",
+    "oxlint": "1.42.0",
+    "pg": "8.18.0",
+    "pino": "10.3.0",
+    "pino-pretty": "13.1.3",
+    "pino-roll": "4.0.0",
+    "typescript": "5.9.3",
+    "zod": "4.3.6"
+  },
+  "catalogs": {
+    "trpc": {
+      "@trpc/client": "11.9.0",
+      "@trpc/server": "11.9.0",
+      "@trpc/tanstack-react-query": "11.9.0"
+    }
+  },
+  "dependencies": {
+    "@toon-format/toon": "2.1.0"
+  }
+}

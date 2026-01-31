@@ -1,0 +1,92 @@
+parameters:
+  - name: environment
+    type: string
+  - name: dependsOn
+    type: object
+    default: []
+  - name: condition
+    type: string
+  - name: namespace
+    type: string
+  - name: tag
+    type: string
+  - name: variableGroup
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: imageRepository
+    type: string
+  - name: deploymentTarget
+    type: string
+    values:
+      - azure
+      - cloudfleet
+  - name: containerRegistryServiceConnection
+    type: string
+    default: "ACR"
+
+stages:
+  - stage: Deploy_${{ upper(parameters.environment) }}
+    displayName: "[${{ upper(parameters.environment) }}] Deploy Web App"
+    dependsOn: ${{ parameters.dependsOn }}
+    condition: ${{ parameters.condition }}
+    variables:
+      - group: ${{ parameters.variableGroup }}
+      - name: targetNamespace
+        value: ${{ parameters.namespace }}
+    jobs:
+      - template: ../jobs/web-app-deployment.yml
+        parameters:
+          environment: ${{ parameters.environment }}
+          serviceConnection: ${{ parameters.serviceConnection }}
+          namespace: ${{ parameters.namespace }}
+          tag: ${{ parameters.tag }}
+          imageRepository: ${{ parameters.imageRepository }}-web-app
+          baseRepository: ${{ parameters.imageRepository }}
+          deploymentTarget: ${{ parameters.deploymentTarget }}
+
+  # Build E2E Runner after deployment (doesn't block deploy pipeline)
+  - stage: BuildE2ERunner_${{ upper(parameters.environment) }}
+    displayName: "[${{ upper(parameters.environment) }}] Build E2E Runner"
+    dependsOn:
+      - Deploy_${{ upper(parameters.environment) }}
+    condition: succeeded()
+    jobs:
+      - job: BuildE2ERunner
+        displayName: "Build and Push E2E Runner"
+        steps:
+          - task: Docker@2
+            displayName: "Build Docker Image"
+            inputs:
+              containerRegistry: ${{ parameters.containerRegistryServiceConnection }}
+              repository: ${{ parameters.imageRepository }}/e2e-runner
+              command: "build"
+              Dockerfile: "$(Build.SourcesDirectory)/jobs/e2e-runner/Dockerfile"
+              buildContext: "$(Build.SourcesDirectory)"
+              arguments: "--build-arg GIT_COMMIT_SHA=$(Build.SourceVersion)"
+              tags: ${{ parameters.tag }}
+            env:
+              DOCKER_BUILDKIT: 1
+          - task: Docker@2
+            displayName: "Push Docker Image"
+            inputs:
+              containerRegistry: ${{ parameters.containerRegistryServiceConnection }}
+              repository: ${{ parameters.imageRepository }}/e2e-runner
+              command: "push"
+              tags: ${{ parameters.tag }}
+
+  - stage: E2E_${{ upper(parameters.environment) }}
+    displayName: "[${{ upper(parameters.environment) }}] E2E"
+    dependsOn:
+      - BuildE2ERunner_${{ upper(parameters.environment) }}
+    condition: succeeded()
+    variables:
+      - group: ${{ parameters.variableGroup }}
+    jobs:
+      - template: ../jobs/e2e-tests-kube.yml
+        parameters:
+          environment: ${{ parameters.environment }}
+          namespace: ${{ parameters.namespace }}
+          tag: ${{ parameters.tag }}
+          serviceConnection: ${{ parameters.serviceConnection }}
+          deploymentTarget: ${{ parameters.deploymentTarget }}

@@ -1,0 +1,188 @@
+
+replicaCount: 1
+
+# Zero-downtime deployment settings
+minReadySeconds: 5
+preStopSleepSeconds: 10
+terminationGracePeriodSeconds: 30
+
+image:
+  repository: blogicapps2-fgbjaff4hhdzcga7.azurecr.io/map-poster-web-app
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: "web-app"
+
+serviceAccount:
+  enable: true
+  automount: true
+  annotations: {}
+  name: ""
+  automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  {}
+
+securityContext:
+  {}
+
+service:
+  type: ClusterIP
+  port: 3000
+  targetPort: 3000
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+    # GZip enabled via nginx ConfigMap
+    # GZip and basic settings only - www redirect handled by separate ingress
+  hosts:
+    - host: map-poster.kube.blogic.cz
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: map-poster-web-app-tls
+      hosts:
+        - map-poster.kube.blogic.cz
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 200m
+    memory: 1Gi
+
+monitoring:
+  enabled: true
+  prometheusName: prometheus-stack
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+    scheme: HTTP
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 2
+  successThreshold: 1
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+    scheme: HTTP
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 2
+  successThreshold: 1
+  failureThreshold: 3
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+persistence:
+  enabled: true
+  accessMode: ReadWriteMany
+  storageClass: azurefile
+  size: 1Gi
+
+volumes: []
+
+volumeMounts: []
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+extraEnvVars:
+  - name: BASE_URL
+    value: "https://map-poster.kube.blogic.cz"
+  - name: BETTER_AUTH_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: web-app-secrets
+        key: BETTER_AUTH_SECRET
+  - name: BETTER_AUTH_URL
+    value: "https://map-poster.kube.blogic.cz"
+  - name: BREVO_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: web-app-secrets
+        key: BREVO_API_KEY
+  - name: CONTACT_FORM_RECIPIENTS
+    value: "gabriel.ecegi@blogic.cz,dominik.branka@blogic.cz,zdenek.huspenina@blogic.cz"
+  - name: DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: web-app-secrets
+        key: DATABASE_URL
+  - name: ENVIRONMENT
+    value: "prod"
+  - name: GITHUB_CLIENT_ID
+    value: "Ov23liW9s6kIQs5ONtjG"
+  - name: GITHUB_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: web-app-secrets
+        key: GITHUB_CLIENT_SECRET
+  - name: GOOGLE_CLIENT_ID
+    value: "172124366238-1damhmmgf84307q1kmo0f256k3q490sr.apps.googleusercontent.com"
+  - name: GOOGLE_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: web-app-secrets
+        key: GOOGLE_CLIENT_SECRET
+  - name: SENTRY_DSN
+    valueFrom:
+      secretKeyRef:
+        name: web-app-secrets
+        key: SENTRY_DSN
+
+hooks:
+  secretName: web-app-secrets
+  preInstall:
+    enabled: true
+    image:
+      repository: blogicapps2-fgbjaff4hhdzcga7.azurecr.io/map-poster/pre-deployment
+      tag: ""
+    backoffLimit: 3
+    activeDeadlineSeconds: 180
+    resources:
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+  postInstall:
+    enabled: true
+    image:
+      repository: blogicapps2-fgbjaff4hhdzcga7.azurecr.io/map-poster/post-deployment
+      tag: ""
+    backoffLimit: 3
+    activeDeadlineSeconds: 180
+    environment: "prod"
+    nodeEnv: "production"
+    resources:
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+      requests:
+        cpu: "200m"
+        memory: "256Mi"

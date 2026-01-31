@@ -1,0 +1,7 @@
+# ck respects .gitignore syntax
+# Add files that are in git but not useful for semantic search
+
+# ck index/cache directory
+.ck/
+
+bun.lock

@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["es2020"],
+    "outDir": "build",
+    "types": ["node"]
+  },
+  "include": ["src/**/*"]
+}

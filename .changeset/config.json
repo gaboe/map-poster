@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.2/schema.json",
+  "changelog": [
+    "@changesets/changelog-github",
+    { "repo": "blogic-cz/map-poster" }
+  ],
+  "commit": false,
+  "fixed": [
+    [
+      "@map-poster/common",
+      "@map-poster/db",
+      "@map-poster/logger",
+      "@map-poster/post-deployment",
+      "@map-poster/pre-deployment",
+      "@map-poster/services"
+    ]
+  ],
+  "linked": [],
+  "access": "restricted",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}

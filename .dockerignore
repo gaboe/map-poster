@@ -1,0 +1,81 @@
+# ===========================================
+# Docker Build Context Exclusions
+# ===========================================
+# This file excludes files from ALL Docker builds.
+# Note: .env.dev, .env.test, .env.prod are NOT excluded
+# because web-app needs them during build.
+
+# --- Dependencies (CRITICAL - saves ~500MB transfer) ---
+node_modules/
+.bun/
+
+# --- Git ---
+.git/
+.gitignore
+.gitattributes
+
+# --- Docker files ---
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# --- Documentation ---
+*.md
+LICENSE
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.editorconfig
+
+# --- Build outputs (rebuilt inside Docker) ---
+**/dist/
+**/build/
+.vite/
+.next/
+.nuxt/
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# --- Test / Coverage ---
+coverage/
+.nyc_output/
+*.lcov
+
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+
+# --- Kubernetes / Helm (not needed in image) ---
+kubernetes/
+
+# --- Development tools ---
+.aider*
+.assistant
+.example
+.sentryclirc
+.claude/
+.ck/
+**/ax-repo.md
+requirements/
+
+# --- Environment (keep .env.dev, .env.test, .env.prod for web-app build) ---
+.env
+.env.local
+.env.*.local
+
+# --- Misc ---
+*.tgz
+*.traineddata
+Makefile

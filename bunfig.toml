@@ -1,0 +1,23 @@
+[install]
+# Auto install peer dependencies
+auto = true
+linker = "isolated"
+
+# Exact versions for better reproducibility
+exact = true
+
+[install.scopes]
+# Trusted scopes for faster installs
+"@map-poster" = { trusted = true }
+
+[test]
+# Coverage thresholds (documented target; not enforced by default)
+# Enable coverage explicitly via `bun test --coverage`.
+# coverageThreshold = { lines = 0.8, functions = 0.7 }
+
+# Bun's function coverage is misleading for Effect Tag-only modules.
+coveragePathIgnorePatterns = [
+  "packages/services/src/context/database.ts",
+  "packages/services/src/health/errors.ts",
+  "packages/services/src/health/services/health-check.ts",
+]

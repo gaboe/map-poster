@@ -1,0 +1,16 @@
+# Canonical domain: https://map-poster.cz
+
+User-agent: *
+Allow: /
+Allow: /contact
+Allow: /privacy-policy
+Allow: /tos
+Allow: /newsroom
+
+Disallow: /app/
+Disallow: /sign-in
+Disallow: /sign-up
+Disallow: /invitations/
+Disallow: /api/
+
+Sitemap: https://map-poster.cz/sitemap.xml

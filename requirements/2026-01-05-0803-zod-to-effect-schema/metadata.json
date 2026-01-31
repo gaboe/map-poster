@@ -1,0 +1,33 @@
+{
+  "id": "zod-to-effect-schema",
+  "started": "2026-01-05T08:03:00.000Z",
+  "lastUpdated": "2026-01-05T12:00:00.000Z",
+  "status": "complete",
+  "phase": "complete",
+  "progress": {
+    "discovery": { "answered": 5, "total": 5 },
+    "detail": { "answered": 5, "total": 5 }
+  },
+  "contextFiles": [
+    "packages/common/src/projects/ids.ts",
+    "packages/common/src/projects/schemas.ts",
+    "packages/common/src/organizations/ids.ts",
+    "packages/common/src/organizations/schemas.ts",
+    "packages/db/src/schema.ts",
+    "apps/web-app/src/infrastructure/trpc/procedures/auth.ts"
+  ],
+  "relatedFeatures": [],
+  "completedWork": {
+    "domainFolders": 8,
+    "brandedIdFiles": 6,
+    "schemaFiles": 8,
+    "trpcRoutersMigrated": 10,
+    "frontendFormsMigrated": 8,
+    "drizzleTablesUpdated": 10,
+    "filesStayingOnZod": 2
+  },
+  "implementationNotes": {
+    "authMiddleware": "Centralized UserId cast in enforceUserIsAuthenticated middleware eliminates individual casts in routers",
+    "frontendForms": "Mix of shared schemas from @map-poster/common and local Effect schemas for form-specific validation"
+  }
+}

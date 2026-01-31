@@ -1,0 +1,56 @@
+{{- if .Values.hooks.preInstall.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "map-poster-web-app.fullname" . }}-pre-install-migration
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "map-poster-web-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: {{ .Values.hooks.preInstall.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.hooks.preInstall.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "map-poster-web-app.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: migration
+          image: "{{ .Values.hooks.preInstall.image.repository }}:{{ .Values.hooks.preInstall.image.tag | default .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.hooks.secretName }}
+                  key: DATABASE_URL
+          resources:
+            {{- toYaml .Values.hooks.preInstall.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

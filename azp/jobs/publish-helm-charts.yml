@@ -1,0 +1,15 @@
+parameters:
+  - name: artifactName
+    type: string
+    default: "drop"
+
+jobs:
+  - job: PublishHelmCharts
+    displayName: "Publish Helm Charts"
+    steps:
+      - task: PublishPipelineArtifact@1
+        displayName: "Publish Helm Charts Artifact"
+        inputs:
+          targetPath: "$(Build.SourcesDirectory)/kubernetes/helm"
+          artifact: ${{ parameters.artifactName }}
+          publishLocation: "pipeline"

@@ -1,0 +1,26 @@
+{
+  "name": "@map-poster/post-deployment",
+  "version": "0.1.0",
+  "description": "Post-deployment jobs for database migration and sync tasks",
+  "type": "module",
+  "scripts": {
+    "start": "bun run index.ts",
+    "server-tools-sync": "bun run server-tools-sync.ts",
+    "build": "bun build index.ts --outdir=dist --target=node",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@map-poster/common": "workspace:*",
+    "@map-poster/db": "workspace:*",
+    "@map-poster/services": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:",
+    "pg": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "typescript": "catalog:"
+  }
+}

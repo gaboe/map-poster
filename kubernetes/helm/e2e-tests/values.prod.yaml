@@ -1,0 +1,7 @@
+env:
+  - name: CI
+    value: "true"
+  - name: BASE_URL
+    value: "https://map-poster.blogic.cz"
+  - name: E2E_SUITE
+    value: "prod"

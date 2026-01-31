@@ -1,0 +1,33 @@
+{
+  "name": "@map-poster/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./queries": "./src/queries/index.ts",
+    "./testing": "./src/__tests__/setup.ts",
+    "./testing/seed": "./src/__tests__/seed.ts"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:visualize": "bunx drizzle-lab visualizer",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@map-poster/common": "workspace:*",
+    "@paralleldrive/cuid2": "catalog:",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "catalog:",
+    "@types/pg": "catalog:",
+    "drizzle-kit": "catalog:"
+  }
+}

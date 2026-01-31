@@ -1,0 +1,222 @@
+parameters:
+  - name: environment
+    type: string
+  - name: namespace
+    type: string
+  - name: tag
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: deploymentTarget
+    type: string
+    values:
+      - azure
+      - cloudfleet
+
+jobs:
+  - deployment: E2E_TESTS_${{ upper(parameters.environment) }}
+    environment: MAP-POSTER-${{ upper(parameters.environment) }}
+    displayName: "[${{ upper(parameters.environment) }}] E2E (Kubernetes Job)"
+    workspace:
+      clean: all
+    variables:
+      - name: namespace
+        value: ${{ parameters.namespace }}
+      - name: artifactBaseDirectory
+        value: "$(Pipeline.Workspace)/drop"
+      - name: chartPath
+        value: "$(artifactBaseDirectory)/e2e-tests"
+      - name: valuesFilePath
+        value: "$(artifactBaseDirectory)/e2e-tests/values.${{ parameters.environment }}.yaml"
+      - name: jobName
+        value: "e2e-tests-e2e-tests"
+      - name: helmOverrides
+        ${{ if eq(parameters.deploymentTarget, 'cloudfleet') }}:
+          value: |
+            image.tag=${{ parameters.tag }}
+            imagePullSecrets[0].name=acr-secret
+        ${{ else }}:
+          value: "image.tag=${{ parameters.tag }}"
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - task: HelmInstaller@1
+              inputs:
+                helmVersionToInstall: "3.18.6"
+              displayName: "Install Helm"
+
+            - task: Kubernetes@1
+              inputs:
+                connectionType: "Kubernetes Service Connection"
+                kubernetesServiceEndpoint: "${{ parameters.serviceConnection }}"
+                command: "login"
+              displayName: "Login to Kubernetes cluster"
+
+            - bash: |
+                kubectl delete job "$(jobName)" -n "$(namespace)" --ignore-not-found
+              displayName: "Delete existing E2E Job"
+
+            - ${{ if eq(parameters.deploymentTarget, 'cloudfleet') }}:
+              - bash: |
+                  kubectl create namespace "$(namespace)" --dry-run=client -o yaml | kubectl apply -f -
+                  kubectl create secret docker-registry acr-secret --namespace "$(namespace)" --docker-server=blogicapps2-fgbjaff4hhdzcga7.azurecr.io --docker-username=blogicapps2 --docker-password="$ACR_PASSWORD" --dry-run=client -o yaml | kubectl apply -f -
+                displayName: "Prepare namespace and docker-registry secret for CloudFleet"
+                env:
+                  ACR_PASSWORD: $(ACR_PASSWORD)
+
+            - task: HelmDeploy@1
+              inputs:
+                connectionType: "Kubernetes Service Connection"
+                kubernetesServiceConnection: "${{ parameters.serviceConnection }}"
+                namespace: "$(namespace)"
+                command: "upgrade"
+                chartType: "FilePath"
+                chartPath: "$(chartPath)"
+                releaseName: "e2e-tests"
+                overrideValues: $(helmOverrides)
+                valueFile: "$(valuesFilePath)"
+                debug: true
+              displayName: "Deploy E2E tests Job"
+
+            - bash: |
+                set -euo pipefail
+
+                echo "Waiting for pod for job $(jobName) in namespace $(namespace)"
+                POD=""
+                for i in $(seq 1 120); do
+                  POD="$(kubectl get pods -n "$(namespace)" -l "job-name=$(jobName)" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+                  if [ -n "$POD" ]; then
+                    break
+                  fi
+                  sleep 1
+                done
+
+                if [ -z "$POD" ]; then
+                  echo "No pod found for job $(jobName)"
+                  echo "##vso[task.setvariable variable=E2EJobSucceeded]false"
+                  echo "##vso[task.setvariable variable=E2EExitCode]127"
+                  exit 0
+                fi
+
+                echo "##vso[task.setvariable variable=E2EPodName]$POD"
+
+                echo "Waiting for e2e-tests container to terminate (pod stays Running via artifacts sidecar)"
+                EXIT_CODE=""
+                for i in $(seq 1 1200); do
+                  EXIT_CODE="$(kubectl get pod -n "$(namespace)" "$POD" -o jsonpath='{.status.containerStatuses[?(@.name=="e2e-tests")].state.terminated.exitCode}' 2>/dev/null || true)"
+                  if [ -n "$EXIT_CODE" ]; then
+                    break
+                  fi
+                  sleep 1
+                done
+
+                if [ -z "$EXIT_CODE" ]; then
+                  echo "Timed out waiting for e2e-tests container termination"
+                  echo "##vso[task.setvariable variable=E2EJobSucceeded]false"
+                  echo "##vso[task.setvariable variable=E2EExitCode]124"
+                  exit 0
+                fi
+
+                echo "Test container exit code: $EXIT_CODE"
+                echo "##vso[task.setvariable variable=E2EExitCode]$EXIT_CODE"
+
+                if [ "$EXIT_CODE" = "0" ]; then
+                  echo "##vso[task.setvariable variable=E2EJobSucceeded]true"
+                else
+                  echo "##vso[task.setvariable variable=E2EJobSucceeded]false"
+                fi
+              displayName: "Wait for E2E container completion"
+              condition: succeededOrFailed()
+              continueOnError: true
+
+            - bash: |
+                set -euo pipefail
+
+                if [ -z "$(E2EPodName)" ]; then
+                  echo "No pod found (E2EPodName missing)"
+                  exit 0
+                fi
+
+                kubectl logs -n "$(namespace)" "$(E2EPodName)" -c e2e-tests || true
+                kubectl logs -n "$(namespace)" "$(E2EPodName)" -c artifacts || true
+              displayName: "Collect E2E logs"
+              condition: succeededOrFailed()
+
+            - bash: |
+                set -euo pipefail
+
+                if [ -z "$(E2EPodName)" ]; then
+                  echo "No pod found (E2EPodName missing)"
+                  exit 0
+                fi
+
+                mkdir -p "$(Build.SourcesDirectory)/apps/web-app"
+
+                kubectl cp -n "$(namespace)" -c artifacts "$(E2EPodName):/artifacts/test-results" "$(Build.SourcesDirectory)/apps/web-app/test-results" || true
+                kubectl cp -n "$(namespace)" -c artifacts "$(E2EPodName):/artifacts/playwright-report" "$(Build.SourcesDirectory)/apps/web-app/playwright-report" || true
+              displayName: "Copy Playwright reports from pod"
+              condition: succeededOrFailed()
+
+            - bash: |
+                TEST_RESULTS_EXISTS="false"
+                PLAYWRIGHT_REPORT_EXISTS="false"
+                if [ -d "$(Build.SourcesDirectory)/apps/web-app/test-results" ]; then
+                  TEST_RESULTS_EXISTS="true"
+                fi
+                if [ -d "$(Build.SourcesDirectory)/apps/web-app/playwright-report" ]; then
+                  PLAYWRIGHT_REPORT_EXISTS="true"
+                fi
+                echo "##vso[task.setvariable variable=TestResultsExist]$TEST_RESULTS_EXISTS"
+                echo "##vso[task.setvariable variable=PlaywrightReportExist]$PLAYWRIGHT_REPORT_EXISTS"
+              displayName: "Check artifacts existence"
+              condition: succeededOrFailed()
+
+            - task: PublishTestResults@2
+              displayName: "Publish test results"
+              inputs:
+                searchFolder: "$(Build.SourcesDirectory)/apps/web-app/test-results"
+                testResultsFormat: "JUnit"
+                testResultsFiles: "e2e-junit-results.xml"
+                mergeTestResults: true
+                failTaskOnFailedTests: true
+                testRunTitle: "E2E Tests - ${{ parameters.environment }}"
+              condition: and(succeededOrFailed(), eq(variables.TestResultsExist, 'true'))
+
+            - task: PublishPipelineArtifact@1
+              displayName: "Publish Playwright report artifact"
+              inputs:
+                targetPath: "$(Build.SourcesDirectory)/apps/web-app/playwright-report"
+                artifact: "playwright-report-${{ lower(parameters.environment) }}"
+              condition: and(succeededOrFailed(), eq(variables.PlaywrightReportExist, 'true'))
+
+            # Add Playwright report link to build summary
+            - bash: |
+                ARTIFACT_URL="$(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=artifacts&pathAsName=false&type=publishedArtifacts"
+                cat > $(Build.SourcesDirectory)/playwright-summary.md << EOF
+                ## 🎭 Playwright E2E Report
+                
+                **Environment:** ${{ parameters.environment }}
+                
+                📊 [View Test Results]($(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)&view=ms.vss-test-web.build-test-results-tab)
+                
+                📁 [Download Playwright HTML Report]($ARTIFACT_URL)
+                
+                > Download the artifact and open \`index.html\` locally to view the interactive report.
+                EOF
+                echo "##vso[task.uploadsummary]$(Build.SourcesDirectory)/playwright-summary.md"
+              displayName: "Add Playwright report to build summary"
+              condition: and(succeededOrFailed(), eq(variables.PlaywrightReportExist, 'true'))
+
+            - bash: |
+                kubectl delete job "$(jobName)" -n "$(namespace)" --ignore-not-found
+              displayName: "Cleanup E2E Job"
+              condition: succeededOrFailed()
+
+            - bash: |
+                if [ "$(E2EJobSucceeded)" != "true" ]; then
+                  echo "E2E Kubernetes job did not succeed (exit=$(E2EExitCode))"
+                  exit 1
+                fi
+              displayName: "Fail pipeline if E2E failed"
+              condition: succeededOrFailed()

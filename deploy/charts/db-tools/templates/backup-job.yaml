@@ -1,0 +1,48 @@
+{{ if .Values.backupJob.create }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "db-tools.fullname" . }}-backup
+  labels:
+    {{- include "db-tools.labels" . | nindent 4 }}
+spec:
+  schedule: "{{ .Values.backupJob.schedule }}"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
+          containers:
+            - name: backup-job
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - /bin/sh
+                - -c
+                - pg_dump -h {{ .Values.db.host }} -p 5432 -U $PGUSER -F t {{ .Values.db.database }} > /mnt/backups/{{ .Values.db.database }}_$(date +%Y-%m-%d).tar
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "db-tools.fullname" . }}-credentials
+                      key: password
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "db-tools.fullname" . }}-credentials
+                      key: username
+              volumeMounts:
+                - name: backups-volume
+                  mountPath: /mnt/backups
+          volumes:
+            - name: backups-volume
+              hostPath:
+                path: /opt/backups/{{ .Values.db.database }}
+                type: DirectoryOrCreate
+          restartPolicy: OnFailure
+{{ end }}

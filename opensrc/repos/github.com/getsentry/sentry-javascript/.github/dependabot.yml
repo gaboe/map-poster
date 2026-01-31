@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'monthly'
+    commit-message:
+      prefix: ci
+      prefix-development: ci
+      include: scope
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    ignore:
+      - dependency-name: '@opentelemetry/instrumentation'
+      - dependency-name: '@opentelemetry/instrumentation-*'
+      - dependency-name: 'typescript'
+    groups:
+      opentelemetry:
+        patterns:
+          - '@opentelemetry/*'
+      remix:
+        patterns:
+          - '@remix-run/*'
+    versioning-strategy: increase
+    commit-message:
+      prefix: feat
+      prefix-development: chore
+      include: scope
+    exclude-paths:
+      - 'dev-packages/e2e-tests/test-applications/**'

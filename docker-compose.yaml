@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_USER=map-poster-user
+      - POSTGRES_PASSWORD=pwd123
+      - POSTGRES_DB=map-poster
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "25540:5432"
+    shm_size: 1g
+
+  web-app:
+    build:
+      context: .
+      dockerfile: apps/web-app/Dockerfile
+      args:
+        VERSION: ${VERSION:-dev-local}
+    env_file:
+      - ./apps/web-app/.env
+    depends_on:
+      - db
+    ports:
+      - "3000:3000"
+
+  pre-deployment:
+    build:
+      context: .
+      dockerfile: jobs/pre-deployment/Dockerfile
+    env_file:
+      - ./jobs/pre-deployment/.env
+    depends_on:
+      - db
+    restart: "no"
+
+  post-deployment:
+    build:
+      context: .
+      dockerfile: jobs/post-deployment/Dockerfile
+    env_file:
+      - ./jobs/post-deployment/.env
+    depends_on:
+      - db
+    restart: "no"
+
+volumes:
+  db-data:

@@ -1,0 +1,71 @@
+parameters:
+  - name: jobName
+    type: string
+  - name: displayName
+    type: string
+  - name: repository
+    type: string
+  - name: dockerfilePath
+    type: string
+  - name: buildContext
+    type: string
+    default: "$(Build.SourcesDirectory)"
+  - name: buildArgs
+    type: string
+    default: ""
+  - name: secrets
+    type: string
+    default: ""
+  - name: extraArgs
+    type: string
+    default: ""
+  - name: containerRegistryServiceConnection
+    type: string
+  - name: tag
+    type: string
+  - name: dependsOn
+    type: object
+    default: []
+
+jobs:
+  - job: ${{ parameters.jobName }}
+    displayName: ${{ parameters.displayName }}
+    ${{ if ne(length(parameters.dependsOn), 0) }}:
+      dependsOn: ${{ parameters.dependsOn }}
+    steps:
+      - task: Docker@2
+        displayName: "Build Docker Image"
+        inputs:
+          containerRegistry: ${{ parameters.containerRegistryServiceConnection }}
+          repository: ${{ parameters.repository }}
+          command: "build"
+          Dockerfile: ${{ parameters.dockerfilePath }}
+          buildContext: ${{ parameters.buildContext }}
+          tags: ${{ parameters.tag }}
+          addBaseImageData: "false"
+          addPipelineData: "false"
+          ${{ if and(and(ne(parameters.buildArgs, ''), ne(parameters.secrets, '')), ne(parameters.extraArgs, '')) }}:
+            arguments: "${{ parameters.buildArgs }} ${{ parameters.secrets }} ${{ parameters.extraArgs }}"
+          ${{ elseif and(ne(parameters.buildArgs, ''), ne(parameters.secrets, '')) }}:
+            arguments: "${{ parameters.buildArgs }} ${{ parameters.secrets }}"
+          ${{ elseif and(ne(parameters.buildArgs, ''), ne(parameters.extraArgs, '')) }}:
+            arguments: "${{ parameters.buildArgs }} ${{ parameters.extraArgs }}"
+          ${{ elseif and(ne(parameters.secrets, ''), ne(parameters.extraArgs, '')) }}:
+            arguments: "${{ parameters.secrets }} ${{ parameters.extraArgs }}"
+          ${{ elseif ne(parameters.buildArgs, '') }}:
+            arguments: "${{ parameters.buildArgs }}"
+          ${{ elseif ne(parameters.secrets, '') }}:
+            arguments: "${{ parameters.secrets }}"
+          ${{ elseif ne(parameters.extraArgs, '') }}:
+            arguments: "${{ parameters.extraArgs }}"
+        env:
+          DOCKER_BUILDKIT: 1
+          SENTRY_AUTH_TOKEN: $(SENTRY_AUTH_TOKEN)
+      - task: Docker@2
+        displayName: "Push Docker Image"
+        inputs:
+          containerRegistry: ${{ parameters.containerRegistryServiceConnection }}
+          repository: ${{ parameters.repository }}
+          command: "push"
+          tags: ${{ parameters.tag }}
+          addPipelineData: "false"

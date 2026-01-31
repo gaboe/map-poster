@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "ck": {
+      "description": "CK - Semantic code search tool - searches code by meaning, not just keywords",
+      "command": "sh",
+      "args": [
+        "-c",
+        "npx -y @beaconbay/ck-search --index . --model jina-code && npx -y @beaconbay/ck-search --serve"
+      ],
+      "cwd": "."
+    }
+  }
+}

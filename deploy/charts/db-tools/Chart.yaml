@@ -1,0 +1,9 @@
+apiVersion: v2
+name: db-tools
+description: Tools for initializing and backing up the database
+
+type: application
+
+version: 1.0.0
+
+appVersion: "2.0.0"

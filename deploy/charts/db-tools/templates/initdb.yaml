@@ -1,0 +1,71 @@
+{{ if .Values.initdb.create }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "db-tools.fullname" . }}-initdb
+  labels:
+    {{- include "db-tools.labels" . | nindent 4 }}
+spec:
+  template:
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: initdb
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for database to be ready..."
+              until nc -z {{ .Values.db.host }} 5432; do sleep 1; done;
+              echo "Database is ready"
+
+              # Create user using psql variables (secure against SQL injection)
+              echo "Creating user..."
+              cat <<'EOF' | psql -h {{ .Values.db.host }} -p 5432 -U {{ .Values.credentials.sa_username }} -d postgres -v username="$PG_USERNAME" -v password="$PG_PASS" || echo "User may already exist, continuing..."
+              CREATE USER :"username" WITH PASSWORD :'password';
+              EOF
+
+              # Create database using psql variables
+              echo "Creating database..."
+              cat <<'EOF' | psql -h {{ .Values.db.host }} -p 5432 -U {{ .Values.credentials.sa_username }} -d postgres -v username="$PG_USERNAME" -v dbname="{{ .Values.db.database }}" || echo "Database may already exist, continuing..."
+              CREATE DATABASE :"dbname" WITH OWNER :"username" ENCODING = 'UTF-8' CONNECTION LIMIT = -1;
+              EOF
+
+              # Create roles (Helm template variables need quoting for hyphens)
+              echo "Creating roles..."
+              cat <<'EOF' | psql -h {{ .Values.db.host }} -p 5432 -U {{ .Values.credentials.sa_username }} -d postgres -v rolename="grp_{{ .Values.db.database }}" || echo "Role may already exist, continuing..."
+              CREATE ROLE :"rolename" WITH NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT NOREPLICATION NOBYPASSRLS CONNECTION LIMIT -1;
+              EOF
+
+              cat <<'EOF' | psql -h {{ .Values.db.host }} -p 5432 -U {{ .Values.credentials.sa_username }} -d postgres -v rolename="grp_{{ .Values.db.database }}_readonly" || echo "Role may already exist, continuing..."
+              CREATE ROLE :"rolename" WITH NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT NOREPLICATION NOBYPASSRLS CONNECTION LIMIT -1;
+              EOF
+
+              echo "Database initialization completed successfully"
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "db-tools.fullname" . }}-credentials
+                  key: superadmin_password
+            - name: PG_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "db-tools.fullname" . }}-credentials
+                  key: username
+            - name: PG_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "db-tools.fullname" . }}-credentials
+                  key: password
+      restartPolicy: OnFailure
+  backoffLimit: 3
+{{ end }}

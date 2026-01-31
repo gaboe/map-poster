@@ -1,0 +1,192 @@
+{
+  "updatedAt": "2026-01-31T18:19:02.314Z",
+  "packages": [
+    {
+      "name": "opensrc",
+      "version": "0.6.0",
+      "registry": "npm",
+      "path": "repos/github.com/vercel-labs/opensrc",
+      "fetchedAt": "2026-01-08T13:05:47.113Z"
+    },
+    {
+      "name": "@beaconbay/ck-search",
+      "version": "0.7.0",
+      "registry": "npm",
+      "path": "repos/github.com/BeaconBay/ck",
+      "fetchedAt": "2026-01-08T13:11:43.253Z"
+    },
+    {
+      "name": "@tanstack/react-router",
+      "version": "1.146.0",
+      "registry": "npm",
+      "path": "repos/github.com/TanStack/router/packages/react-router",
+      "fetchedAt": "2026-01-08T16:52:43.028Z"
+    },
+    {
+      "name": "@tanstack/react-start",
+      "version": "1.149.2",
+      "registry": "npm",
+      "path": "repos/github.com/TanStack/router/packages/react-start",
+      "fetchedAt": "2026-01-13T06:59:33.071Z"
+    },
+    {
+      "name": "@tanstack/react-start-server-functions-client",
+      "version": "1.114.9",
+      "registry": "npm",
+      "path": "repos/github.com/TanStack/router/packages/react-start-server-functions-client",
+      "fetchedAt": "2026-01-13T06:59:51.113Z"
+    },
+    {
+      "name": "@tanstack/start-client-core",
+      "version": "1.149.1",
+      "registry": "npm",
+      "path": "repos/github.com/TanStack/router/packages/start-client-core",
+      "fetchedAt": "2026-01-13T07:00:50.345Z"
+    },
+    {
+      "name": "@tanstack/server-functions-plugin",
+      "version": "1.142.1",
+      "registry": "npm",
+      "path": "repos/github.com/TanStack/router/packages/server-functions-plugin",
+      "fetchedAt": "2026-01-13T07:03:39.015Z"
+    },
+    {
+      "name": "@tanstack/directive-functions-plugin",
+      "version": "1.142.1",
+      "registry": "npm",
+      "path": "repos/github.com/TanStack/router/packages/directive-functions-plugin",
+      "fetchedAt": "2026-01-13T07:04:04.973Z"
+    },
+    {
+      "name": "@tanstack/start-server-core",
+      "version": "1.149.1",
+      "registry": "npm",
+      "path": "repos/github.com/TanStack/router/packages/start-server-core",
+      "fetchedAt": "2026-01-13T07:04:56.525Z"
+    },
+    {
+      "name": "@tanstack/start-plugin-core",
+      "version": "1.149.2",
+      "registry": "npm",
+      "path": "repos/github.com/TanStack/router/packages/start-plugin-core",
+      "fetchedAt": "2026-01-13T07:05:23.379Z"
+    },
+    {
+      "name": "effect",
+      "version": "3.19.14",
+      "registry": "npm",
+      "path": "repos/github.com/Effect-TS/effect/packages/effect",
+      "fetchedAt": "2026-01-13T17:08:46.748Z"
+    }
+  ],
+  "repos": [
+    {
+      "name": "github.com/tailwindlabs/tailwindcss.com",
+      "version": "main",
+      "path": "repos/github.com/tailwindlabs/tailwindcss.com",
+      "fetchedAt": "2026-01-31T18:19:02.313Z"
+    },
+    {
+      "name": "github.com/Effect-TS/effect",
+      "version": "main",
+      "path": "repos/github.com/Effect-TS/effect",
+      "fetchedAt": "2026-01-31T18:18:41.639Z"
+    },
+    {
+      "name": "github.com/sst/opencode",
+      "version": "dev",
+      "path": "repos/github.com/sst/opencode",
+      "fetchedAt": "2026-01-31T13:53:01.649Z"
+    },
+    {
+      "name": "github.com/TanStack/router",
+      "version": "main",
+      "path": "repos/github.com/TanStack/router",
+      "fetchedAt": "2026-01-31T18:18:40.166Z"
+    },
+    {
+      "name": "github.com/better-auth/better-auth",
+      "version": "canary",
+      "path": "repos/github.com/better-auth/better-auth",
+      "fetchedAt": "2026-01-31T18:18:39.497Z"
+    },
+    {
+      "name": "github.com/triggerdotdev/trigger.dev",
+      "version": "main",
+      "path": "repos/github.com/triggerdotdev/trigger.dev",
+      "fetchedAt": "2026-01-31T18:18:43.703Z"
+    },
+    {
+      "name": "github.com/ax-llm/ax",
+      "version": "main",
+      "path": "repos/github.com/ax-llm/ax",
+      "fetchedAt": "2026-01-31T13:52:48.211Z"
+    },
+    {
+      "name": "github.com/mui/base-ui",
+      "version": "master",
+      "path": "repos/github.com/mui/base-ui",
+      "fetchedAt": "2026-01-31T18:18:36.904Z"
+    },
+    {
+      "name": "github.com/trpc/trpc",
+      "version": "main",
+      "path": "repos/github.com/trpc/trpc",
+      "fetchedAt": "2026-01-31T18:18:34.272Z"
+    },
+    {
+      "name": "github.com/drizzle-team/drizzle-orm",
+      "version": "main",
+      "path": "repos/github.com/drizzle-team/drizzle-orm",
+      "fetchedAt": "2026-01-31T13:52:54.724Z"
+    },
+    {
+      "name": "github.com/TanStack/query",
+      "version": "main",
+      "path": "repos/github.com/TanStack/query",
+      "fetchedAt": "2026-01-31T18:18:41.593Z"
+    },
+    {
+      "name": "github.com/getsentry/sentry-javascript",
+      "version": "develop",
+      "path": "repos/github.com/getsentry/sentry-javascript",
+      "fetchedAt": "2026-01-31T18:18:41.328Z"
+    },
+    {
+      "name": "github.com/pinojs/pino",
+      "version": "main",
+      "path": "repos/github.com/pinojs/pino",
+      "fetchedAt": "2026-01-31T18:18:33.312Z"
+    },
+    {
+      "name": "github.com/colinhacks/zod",
+      "version": "main",
+      "path": "repos/github.com/colinhacks/zod",
+      "fetchedAt": "2026-01-31T18:18:35.376Z"
+    },
+    {
+      "name": "github.com/clauderic/dnd-kit",
+      "version": "master",
+      "path": "repos/github.com/clauderic/dnd-kit",
+      "fetchedAt": "2026-01-31T18:18:33.341Z"
+    },
+    {
+      "name": "github.com/shadcn-ui/ui",
+      "version": "main",
+      "path": "repos/github.com/shadcn-ui/ui",
+      "fetchedAt": "2026-01-31T18:18:42.899Z"
+    },
+    {
+      "name": "github.com/kitlangton/effect-solutions",
+      "version": "main",
+      "path": "repos/github.com/kitlangton/effect-solutions",
+      "fetchedAt": "2026-01-31T18:18:35.833Z"
+    },
+    {
+      "name": "github.com/anthropics/claude-code-action",
+      "version": "main",
+      "path": "repos/github.com/anthropics/claude-code-action",
+      "fetchedAt": "2026-01-31T18:18:33.192Z"
+    }
+  ]
+}
