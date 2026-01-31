@@ -5,3 +5,6 @@
 .ck/
 
 bun.lock
+
+# External source code for reference only
+opensrc/
