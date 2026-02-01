@@ -1,6 +1,4 @@
-import { Header } from "@/web/landing/components/header";
 import { Footer } from "@/web/landing/components/footer";
-import { PRPromotionBanner } from "@/web/components/pr-promotion-banner";
 import type { ReactNode } from "react";
 import {
   createOrganizationSchema,
@@ -39,8 +37,6 @@ export function WebLayout({ children }: Props) {
       <div className="min-h-screen flex flex-col bg-background relative overflow-hidden">
         <GradientBackground variant="default" />
 
-        <Header />
-        <PRPromotionBanner />
         <main className="flex-1 relative z-10">
           {children}
         </main>

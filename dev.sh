@@ -118,7 +118,18 @@ fi
 
 echo ""
 
-echo "🔍 Step 7: Warming up CK semantic search index..."
+echo "🐍 Step 7: Setting up Python API dependencies..."
+echo ""
+if command -v uv &> /dev/null; then
+  (cd apps/api && uv sync)
+  printf "${GREEN}✓${NC} Python API dependencies installed!\n"
+else
+  printf "${YELLOW}⚠${NC} uv not installed, skipping Python API setup\n"
+  echo "   Install uv first: curl -LsSf https://astral.sh/uv/install.sh | sh"
+fi
+echo ""
+
+echo "🔍 Step 8: Warming up CK semantic search index..."
 printf "${YELLOW}ℹ${NC}  First run may take a few minutes to build the index (jina-code model).\n"
 printf "${YELLOW}ℹ${NC}  Subsequent runs use delta indexing and are much faster.\n"
 bun run ck:warmup &

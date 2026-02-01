@@ -111,7 +111,7 @@ export function GeneralError({
           <h3 className="text-xl font-semibold mb-6">
             Popular Pages
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+          <div className="grid grid-cols-1 gap-4 max-w-md mx-auto">
             <Link to="/app/dashboard" className="block">
               <Card className="py-0 transition-colors hover:bg-muted/20 hover:ring-orange-500/30">
                 <CardContent className="p-4">
@@ -122,32 +122,6 @@ export function GeneralError({
                 </CardContent>
               </Card>
             </Link>
-            <Link to="/contact" className="block">
-              <Card className="py-0 transition-colors hover:bg-muted/20 hover:ring-orange-500/30">
-                <CardContent className="p-4">
-                  <p className="font-medium">Contact</p>
-                  <p className="text-sm text-muted-foreground">
-                    Get in touch
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
-        </div>
-
-        <div className="pt-8 mt-8">
-          <div className="text-sm text-muted-foreground">
-            <p className="font-semibold mb-2">Need help?</p>
-            <p>
-              If you think this is a mistake, please{" "}
-              <Link
-                to="/contact"
-                className="text-orange-500 hover:text-orange-600 underline"
-              >
-                contact support
-              </Link>
-              .
-            </p>
           </div>
         </div>
       </div>
