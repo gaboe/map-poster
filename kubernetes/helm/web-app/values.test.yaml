@@ -110,48 +110,34 @@ tolerations: []
 affinity: {}
 
 extraEnvVars:
-  - name: BASE_URL
-    value: "https://map-poster-test.kube.blogic.cz"
-  - name: BETTER_AUTH_SECRET
-    valueFrom:
-      secretKeyRef:
-        name: web-app-secrets
-        key: BETTER_AUTH_SECRET
-  - name: BETTER_AUTH_URL
-    value: "https://map-poster-test.kube.blogic.cz"
-  - name: BREVO_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: web-app-secrets
-        key: BREVO_API_KEY
-  - name: CONTACT_FORM_RECIPIENTS
-    value: "gabriel.ecegi@blogic.cz,dominik.branka@blogic.cz,zdenek.huspenina@blogic.cz"
-  - name: DATABASE_URL
-    valueFrom:
-      secretKeyRef:
-        name: web-app-secrets
-        key: DATABASE_URL
-  - name: ENVIRONMENT
-    value: "test"
-  - name: GITHUB_CLIENT_ID
-    value: "Ov23liW9s6kIQs5ONtjG"
-  - name: GITHUB_CLIENT_SECRET
-    valueFrom:
-      secretKeyRef:
-        name: web-app-secrets
-        key: GITHUB_CLIENT_SECRET
-  - name: GOOGLE_CLIENT_ID
-    value: "172124366238-1damhmmgf84307q1kmo0f256k3q490sr.apps.googleusercontent.com"
-  - name: GOOGLE_CLIENT_SECRET
-    valueFrom:
-      secretKeyRef:
-        name: web-app-secrets
-        key: GOOGLE_CLIENT_SECRET
-  - name: SENTRY_DSN
-    valueFrom:
-      secretKeyRef:
-        name: web-app-secrets
-        key: SENTRY_DSN
+   - name: BASE_URL
+     value: "https://map-poster-test.kube.blogic.cz"
+   - name: BETTER_AUTH_SECRET
+     valueFrom:
+       secretKeyRef:
+         name: web-app-secrets
+         key: BETTER_AUTH_SECRET
+   - name: BETTER_AUTH_URL
+     value: "https://map-poster-test.kube.blogic.cz"
+   - name: BREVO_API_KEY
+     valueFrom:
+       secretKeyRef:
+         name: web-app-secrets
+         key: BREVO_API_KEY
+   - name: CONTACT_FORM_RECIPIENTS
+     value: "gabriel.ecegi@blogic.cz,dominik.branka@blogic.cz,zdenek.huspenina@blogic.cz"
+   - name: DATABASE_URL
+     valueFrom:
+       secretKeyRef:
+         name: web-app-secrets
+         key: DATABASE_URL
+   - name: ENVIRONMENT
+     value: "test"
+   - name: SENTRY_DSN
+     valueFrom:
+       secretKeyRef:
+         name: web-app-secrets
+         key: SENTRY_DSN
 
 hooks:
   secretName: web-app-secrets

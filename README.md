@@ -162,43 +162,7 @@ bun run test:e2e
 bun run test:e2e:ui
 ```
 
-### 3. OAuth Configuration (Optional)
-
-To enable GitHub and Google social login, configure OAuth credentials in `apps/web-app/.env`:
-
-**GitHub OAuth:**
-
-1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
-2. Create a new OAuth App
-3. Set Authorization callback URL to: `http://localhost:3000/api/auth/callback/github`
-4. Copy Client ID and Client Secret to `.env`:
-   ```
-   GITHUB_CLIENT_ID=your_client_id
-   GITHUB_CLIENT_SECRET=your_client_secret
-   ```
-
-**Google OAuth:**
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing one
-3. Enable Google+ API
-4. Create OAuth 2.0 credentials
-5. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
-6. Copy Client ID and Client Secret to `.env`:
-   ```
-   GOOGLE_CLIENT_ID=your_client_id
-   GOOGLE_CLIENT_SECRET=your_client_secret
-   ```
-
-**If you don't need social login:**
-Remove or comment out these variables in `apps/web-app/.env`:
-
-- `GITHUB_CLIENT_ID`
-- `GITHUB_CLIENT_SECRET`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-
-### 4. Claude Code GitHub Integration (Recommended)
+### 3. Claude Code GitHub Integration (Recommended)
 
 To enable AI-powered code reviews and automated PR assistance, follow these steps:
 
@@ -224,7 +188,7 @@ claude
 
 > **What does this enable?** Once installed, you can mention `@claude` in any PR or issue to get AI-powered code analysis, suggestions, and even automated implementations.
 
-### 5. Configure Sentry Seer (AI Error Analysis)
+### 4. Configure Sentry Seer (AI Error Analysis)
 
 Your project has Sentry error tracking enabled. Configure Seer AI to automatically analyze errors and create fix PRs:
 

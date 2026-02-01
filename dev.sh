@@ -118,19 +118,6 @@ fi
 
 echo ""
 
-printf "${YELLOW}⚙️  OAuth Configuration (Optional):${NC}\n"
-echo ""
-echo "To enable GitHub/Google social login, configure in:"
-printf "   ${BLUE}apps/web-app/.env${NC}\n"
-echo ""
-echo "Required credentials:"
-printf "   • ${BLUE}GITHUB_CLIENT_ID${NC} + ${BLUE}GITHUB_CLIENT_SECRET${NC}\n"
-printf "   • ${BLUE}GOOGLE_CLIENT_ID${NC} + ${BLUE}GOOGLE_CLIENT_SECRET${NC}\n"
-echo ""
-echo "If not needed, remove these variables from .env"
-echo "See README.md for setup instructions"
-echo ""
-
 echo "🔍 Step 7: Warming up CK semantic search index..."
 printf "${YELLOW}ℹ${NC}  First run may take a few minutes to build the index (jina-code model).\n"
 printf "${YELLOW}ℹ${NC}  Subsequent runs use delta indexing and are much faster.\n"

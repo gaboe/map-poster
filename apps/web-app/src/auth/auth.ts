@@ -93,26 +93,7 @@ export const auth = betterAuth({
       }
     }),
   },
-  socialProviders: {
-    ...(serverEnv.GITHUB_CLIENT_ID &&
-    serverEnv.GITHUB_CLIENT_SECRET
-      ? {
-          github: {
-            clientId: serverEnv.GITHUB_CLIENT_ID,
-            clientSecret: serverEnv.GITHUB_CLIENT_SECRET,
-          },
-        }
-      : {}),
-    ...(serverEnv.GOOGLE_CLIENT_ID &&
-    serverEnv.GOOGLE_CLIENT_SECRET
-      ? {
-          google: {
-            clientId: serverEnv.GOOGLE_CLIENT_ID,
-            clientSecret: serverEnv.GOOGLE_CLIENT_SECRET,
-          },
-        }
-      : {}),
-  },
+  socialProviders: {},
   emailAndPassword: {
     enabled: true,
   },

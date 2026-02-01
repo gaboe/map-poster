@@ -63,8 +63,6 @@ jobs:
                   "--from-literal=BETTER_AUTH_SECRET=$(BETTER_AUTH_SECRET)"
                   "--from-literal=BREVO_API_KEY=$(BREVO_API_KEY)"
                   "--from-literal=DATABASE_URL=$(DATABASE_URL)"
-                  "--from-literal=GITHUB_CLIENT_SECRET=$(GITHUB_CLIENT_SECRET)"
-                  "--from-literal=GOOGLE_CLIENT_SECRET=$(GOOGLE_CLIENT_SECRET)"
                   "--from-literal=SENTRY_DSN=$(SENTRY_DSN)"
                 )
                 kubectl create namespace $(namespace) --dry-run=client -o yaml | kubectl apply -f -

@@ -10,10 +10,10 @@ export const env = createEnv({
     CONTACT_FORM_RECIPIENTS: z.string(),
     DATABASE_URL: z.string(),
     ENVIRONMENT: z.string(),
-    GITHUB_CLIENT_ID: z.string().optional(),
-    GITHUB_CLIENT_SECRET: z.string().optional(),
-    GOOGLE_CLIENT_ID: z.string().optional(),
-    GOOGLE_CLIENT_SECRET: z.string().optional(),
+    MAP_POSTER_API_URL: z
+      .string()
+      .url()
+      .default("http://localhost:8000"),
     SENTRY_DSN: z.url().or(z.literal("")).optional(),
     VERSION: z.string(),
   },
