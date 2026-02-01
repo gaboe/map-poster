@@ -24,7 +24,9 @@ import { Route as WebSupportRouteImport } from './routes/_web/support'
 import { Route as WebPrivacyPolicyRouteImport } from './routes/_web/privacy-policy'
 import { Route as WebContactRouteImport } from './routes/_web/contact'
 import { Route as AppAdminRouteRouteImport } from './routes/app/admin/route'
+import { Route as WebPosterRouteRouteImport } from './routes/_web/poster/route'
 import { Route as AppAdminIndexRouteImport } from './routes/app/admin/index'
+import { Route as WebPosterIndexRouteImport } from './routes/_web/poster/index'
 import { Route as WebNewsroomIndexRouteImport } from './routes/_web/newsroom/index'
 import { Route as AppAdminUsersRouteImport } from './routes/app/admin/users'
 import { Route as AppAdminObservabilityRouteImport } from './routes/app/admin/observability'
@@ -113,10 +115,20 @@ const AppAdminRouteRoute = AppAdminRouteRouteImport.update({
   path: '/admin',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const WebPosterRouteRoute = WebPosterRouteRouteImport.update({
+  id: '/poster',
+  path: '/poster',
+  getParentRoute: () => WebRouteRoute,
+} as any)
 const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppAdminRouteRoute,
+} as any)
+const WebPosterIndexRoute = WebPosterIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => WebPosterRouteRoute,
 } as any)
 const WebNewsroomIndexRoute = WebNewsroomIndexRouteImport.update({
   id: '/newsroom/',
@@ -187,10 +199,12 @@ const ApiOgNewsroomArticleIdRoute = ApiOgNewsroomArticleIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof WebIndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/poster': typeof WebPosterRouteRouteWithChildren
   '/app/admin': typeof AppAdminRouteRouteWithChildren
   '/contact': typeof WebContactRoute
   '/privacy-policy': typeof WebPrivacyPolicyRoute
@@ -199,22 +213,22 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/invitations/$id': typeof InvitationsIdRoute
-  '/': typeof WebIndexRoute
   '/app/': typeof AppIndexRoute
   '/newsroom/$articleId': typeof WebNewsroomArticleIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/app/admin/observability': typeof AppAdminObservabilityRoute
   '/app/admin/users': typeof AppAdminUsersRoute
-  '/newsroom': typeof WebNewsroomIndexRoute
+  '/newsroom/': typeof WebNewsroomIndexRoute
+  '/poster/': typeof WebPosterIndexRoute
   '/app/admin/': typeof AppAdminIndexRoute
   '/api/og/newsroom/$articleId': typeof ApiOgNewsroomArticleIdRoute
   '/api/og/page/$slug': typeof ApiOgPageSlugRoute
   '/app/organization/$id/members': typeof AppOrganizationIdMembersRoute
   '/app/organization/$id/settings': typeof AppOrganizationIdSettingsRoute
   '/app/project/$id/settings': typeof AppProjectIdSettingsRoute
-  '/app/organization/$id': typeof AppOrganizationIdIndexRoute
-  '/app/project/$id': typeof AppProjectIdIndexRoute
+  '/app/organization/$id/': typeof AppOrganizationIdIndexRoute
+  '/app/project/$id/': typeof AppProjectIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
@@ -235,6 +249,7 @@ export interface FileRoutesByTo {
   '/app/admin/observability': typeof AppAdminObservabilityRoute
   '/app/admin/users': typeof AppAdminUsersRoute
   '/newsroom': typeof WebNewsroomIndexRoute
+  '/poster': typeof WebPosterIndexRoute
   '/app/admin': typeof AppAdminIndexRoute
   '/api/og/newsroom/$articleId': typeof ApiOgNewsroomArticleIdRoute
   '/api/og/page/$slug': typeof ApiOgPageSlugRoute
@@ -251,6 +266,7 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/_web/poster': typeof WebPosterRouteRouteWithChildren
   '/app/admin': typeof AppAdminRouteRouteWithChildren
   '/_web/contact': typeof WebContactRoute
   '/_web/privacy-policy': typeof WebPrivacyPolicyRoute
@@ -267,6 +283,7 @@ export interface FileRoutesById {
   '/app/admin/observability': typeof AppAdminObservabilityRoute
   '/app/admin/users': typeof AppAdminUsersRoute
   '/_web/newsroom/': typeof WebNewsroomIndexRoute
+  '/_web/poster/': typeof WebPosterIndexRoute
   '/app/admin/': typeof AppAdminIndexRoute
   '/api/og/newsroom/$articleId': typeof ApiOgNewsroomArticleIdRoute
   '/api/og/page/$slug': typeof ApiOgPageSlugRoute
@@ -279,10 +296,12 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/app'
     | '/sign-in'
     | '/sign-up'
     | '/sitemap.xml'
+    | '/poster'
     | '/app/admin'
     | '/contact'
     | '/privacy-policy'
@@ -291,22 +310,22 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/app/dashboard'
     | '/invitations/$id'
-    | '/'
     | '/app/'
     | '/newsroom/$articleId'
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/app/admin/observability'
     | '/app/admin/users'
-    | '/newsroom'
+    | '/newsroom/'
+    | '/poster/'
     | '/app/admin/'
     | '/api/og/newsroom/$articleId'
     | '/api/og/page/$slug'
     | '/app/organization/$id/members'
     | '/app/organization/$id/settings'
     | '/app/project/$id/settings'
-    | '/app/organization/$id'
-    | '/app/project/$id'
+    | '/app/organization/$id/'
+    | '/app/project/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/sign-in'
@@ -327,6 +346,7 @@ export interface FileRouteTypes {
     | '/app/admin/observability'
     | '/app/admin/users'
     | '/newsroom'
+    | '/poster'
     | '/app/admin'
     | '/api/og/newsroom/$articleId'
     | '/api/og/page/$slug'
@@ -342,6 +362,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/sitemap.xml'
+    | '/_web/poster'
     | '/app/admin'
     | '/_web/contact'
     | '/_web/privacy-policy'
@@ -358,6 +379,7 @@ export interface FileRouteTypes {
     | '/app/admin/observability'
     | '/app/admin/users'
     | '/_web/newsroom/'
+    | '/_web/poster/'
     | '/app/admin/'
     | '/api/og/newsroom/$articleId'
     | '/api/og/page/$slug'
@@ -415,7 +437,7 @@ declare module '@tanstack/react-router' {
     '/_web': {
       id: '/_web'
       path: ''
-      fullPath: ''
+      fullPath: '/'
       preLoaderRoute: typeof WebRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -489,6 +511,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminRouteRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_web/poster': {
+      id: '/_web/poster'
+      path: '/poster'
+      fullPath: '/poster'
+      preLoaderRoute: typeof WebPosterRouteRouteImport
+      parentRoute: typeof WebRouteRoute
+    }
     '/app/admin/': {
       id: '/app/admin/'
       path: '/'
@@ -496,10 +525,17 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminIndexRouteImport
       parentRoute: typeof AppAdminRouteRoute
     }
+    '/_web/poster/': {
+      id: '/_web/poster/'
+      path: '/'
+      fullPath: '/poster/'
+      preLoaderRoute: typeof WebPosterIndexRouteImport
+      parentRoute: typeof WebPosterRouteRoute
+    }
     '/_web/newsroom/': {
       id: '/_web/newsroom/'
       path: '/newsroom'
-      fullPath: '/newsroom'
+      fullPath: '/newsroom/'
       preLoaderRoute: typeof WebNewsroomIndexRouteImport
       parentRoute: typeof WebRouteRoute
     }
@@ -541,14 +577,14 @@ declare module '@tanstack/react-router' {
     '/app/project/$id/': {
       id: '/app/project/$id/'
       path: '/project/$id'
-      fullPath: '/app/project/$id'
+      fullPath: '/app/project/$id/'
       preLoaderRoute: typeof AppProjectIdIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/organization/$id/': {
       id: '/app/organization/$id/'
       path: '/organization/$id'
-      fullPath: '/app/organization/$id'
+      fullPath: '/app/organization/$id/'
       preLoaderRoute: typeof AppOrganizationIdIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
@@ -590,7 +626,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface WebPosterRouteRouteChildren {
+  WebPosterIndexRoute: typeof WebPosterIndexRoute
+}
+
+const WebPosterRouteRouteChildren: WebPosterRouteRouteChildren = {
+  WebPosterIndexRoute: WebPosterIndexRoute,
+}
+
+const WebPosterRouteRouteWithChildren = WebPosterRouteRoute._addFileChildren(
+  WebPosterRouteRouteChildren,
+)
+
 interface WebRouteRouteChildren {
+  WebPosterRouteRoute: typeof WebPosterRouteRouteWithChildren
   WebContactRoute: typeof WebContactRoute
   WebPrivacyPolicyRoute: typeof WebPrivacyPolicyRoute
   WebSupportRoute: typeof WebSupportRoute
@@ -601,6 +650,7 @@ interface WebRouteRouteChildren {
 }
 
 const WebRouteRouteChildren: WebRouteRouteChildren = {
+  WebPosterRouteRoute: WebPosterRouteRouteWithChildren,
   WebContactRoute: WebContactRoute,
   WebPrivacyPolicyRoute: WebPrivacyPolicyRoute,
   WebSupportRoute: WebSupportRoute,
@@ -672,13 +722,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
