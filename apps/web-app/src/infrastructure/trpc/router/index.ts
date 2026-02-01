@@ -13,10 +13,12 @@ import { router as observabilityRouter } from "@/admin/trpc/observability";
 import { router as contactRouter } from "@/contact/trpc/router";
 import { projectPermissionsRouter } from "@/project-permissions/trpc/project-permissions";
 import { router as testingRouter } from "@/infrastructure/trpc/testing";
+import { router as mapPosterRouter } from "@/map-poster/trpc/router";
 
 export const appRouter = createTRPCRouter({
   admin: adminRouter,
   contact: contactRouter,
+  mapPoster: mapPosterRouter,
   observability: observabilityRouter,
   organization: organizationRouter,
   organizationInvitations: organizationInvitationsRouter,
