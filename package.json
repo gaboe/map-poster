@@ -32,7 +32,7 @@
     "db:visualize": "cd packages/db && bun db:visualize",
     "post-deployment": "cd jobs/post-deployment && bun run start",
     "pre-deployment": "cd jobs/pre-deployment && bun run start",
-    "dev": "bun run ck:warmup & cd apps/api && uv run uvicorn app.main:app --port 8000 & cd ../web-app && bun run dev",
+    "dev": "bun run ck:warmup & (cd apps/api && uv run uvicorn app.main:app --port 8000) & (cd apps/web-app && bun run dev)",
     "dev:web-app": "cd apps/web-app && bun run dev",
     "test": "vitest run --reporter=dot --silent",
     "test:coverage": "vitest run --coverage",

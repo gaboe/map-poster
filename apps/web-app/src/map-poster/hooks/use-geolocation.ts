@@ -109,14 +109,16 @@ export function useGeolocation() {
   });
 
   useEffect(() => {
-    Effect.runPromise(getGeolocation()).then((location) => {
-      setResult({
-        lat: location.lat,
-        lon: location.lon,
-        city: location.city,
-        status: "success",
-      });
-    });
+    void Effect.runPromise(getGeolocation()).then(
+      (location) => {
+        setResult({
+          lat: location.lat,
+          lon: location.lon,
+          city: location.city,
+          status: "success",
+        });
+      }
+    );
   }, []);
 
   return result;

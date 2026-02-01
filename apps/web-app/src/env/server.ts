@@ -12,7 +12,6 @@ export const env = createEnv({
     ENVIRONMENT: z.string(),
     MAP_POSTER_API_URL: z
       .string()
-      .url()
       .default("http://localhost:8000"),
     SENTRY_DSN: z.url().or(z.literal("")).optional(),
     VERSION: z.string(),
