@@ -20,28 +20,27 @@
 
 Skills contain detailed patterns, examples, and project-specific conventions. This file provides quick rules only.
 
-| When working on... | LOAD skill first |
-|-------------------|------------------|
-| Database tables, queries, migrations, relations | `drizzle-database` |
-| TRPC routers, procedures, middleware, errors | `trpc-patterns` |
-| Routes, loaders, prefetching, forms, queries | `tanstack-frontend` |
-| Authentication, sessions, protected procedures | `better-auth` |
-| Helm charts, env vars, K8s deployments | `kubernetes-helm` |
-| Sentry SDK, error tracking, tracing spans | `sentry-integration` |
-| Production/test issues, performance debugging | `production-troubleshooting` |
-| Unit tests, TRPC integration, E2E tests | `testing-patterns` |
-| Effect services, layers, error handling | `effect-expert` |
-| N+1 fixes, batch operations, query optimization | `performance-optimization` |
-| UI components, styling, layouts | `frontend-design` |
-| Marketing copy, landing pages | `marketing-expert` |
-| Azure DevOps, pipeline debugging | `azure-devops-debugging` |
-| Something doesn't work, need to debug library | `debugging-with-opensrc` |
+| When working on...                              | LOAD skill first             |
+| ----------------------------------------------- | ---------------------------- |
+| Database tables, queries, migrations, relations | `drizzle-database`           |
+| TRPC routers, procedures, middleware, errors    | `trpc-patterns`              |
+| Routes, loaders, prefetching, forms, queries    | `tanstack-frontend`          |
+| Authentication, sessions, protected procedures  | `better-auth`                |
+| Sentry SDK, error tracking, tracing spans       | `sentry-integration`         |
+| Production/test issues, performance debugging   | `production-troubleshooting` |
+| Unit tests, TRPC integration, E2E tests         | `testing-patterns`           |
+| Effect services, layers, error handling         | `effect-expert`              |
+| N+1 fixes, batch operations, query optimization | `performance-optimization`   |
+| UI components, styling, layouts                 | `frontend-design`            |
+| Marketing copy, landing pages                   | `marketing-expert`           |
+| Azure DevOps, pipeline debugging                | `azure-devops-debugging`     |
+| Something doesn't work, need to debug library   | `debugging-with-opensrc`     |
 
 ### Autonomous Analysis
 
 - **Deep investigation first**: Before asking questions, thoroughly investigate the codebase to understand context, patterns, and existing implementations
 - **Minimize questions**: Only ask when information cannot be found in the codebase or documentation
-- **Self-discovery**: Use available tools to find answers: MCP tools (CK semantic search, Exa search, Postgres, Sentry) and CLI tools (git, az, kubectl, gh, opensrc) - see "Available Tools" section
+- **Self-discovery**: Use available tools to find answers: MCP tools (CK semantic search, Exa search, Postgres, Sentry) and CLI tools (git, az, gh, opensrc) - see "Available Tools" section
 - **Pattern recognition**: Identify existing patterns in the codebase and follow them consistently
 - **Show findings**: When presenting analysis, show what you discovered and your reasoning
 
@@ -54,38 +53,26 @@ Skills contain detailed patterns, examples, and project-specific conventions. Th
 - **Environment variables**: Always sort env variables and settings keys alphabetically
 - **Environment infrastructure**: All env variables must be added to:
   1. App-specific `.env.example` and `.env` files with default `xxx` values
-  2. Helm values files (see structure below)
-  3. CI/CD pipeline configuration (if applicable)
+  2. `docker-compose.yml` and `docker-compose.prod.yml` when applicable
+  3. Coolify environment configuration (production)
+  4. CI/CD pipeline configuration (if applicable)
 
-**Helm Values Structure:**
+### Docker Compose Deployment
 
-```
-kubernetes/helm/
-├── web-app/
-│   ├── values.test.yaml    # Test environment
-│   └── values.prod.yaml    # Production environment
-└── e2e-tests/
-    ├── values.yaml         # Base/default values
-    ├── values.test.yaml    # Test environment overrides
-    └── values.prod.yaml    # Production environment overrides
+**Local Development:**
+
+```bash
+docker compose up -d      # Start all services
+docker compose logs -f    # View logs
+docker compose down       # Stop all services
 ```
 
-**Adding Environment Variables to Helm:**
+**Production (Coolify):**
 
-```yaml
-# In values.{test,prod}.yaml - use extraEnvVars array (keep alphabetically sorted!)
-extraEnvVars:
-  # Non-sensitive - direct value
-  - name: MY_NEW_VAR
-    value: "my-value"
-
-  # Sensitive - reference a secret
-  - name: MY_SECRET_VAR
-    valueFrom:
-      secretKeyRef:
-        name: web-app-secrets
-        key: MY_SECRET_VAR
-```
+- Managed via Coolify dashboard at `clf.gaboe.xyz`
+- Uses `docker-compose.prod.yml`
+- Environment variables configured in Coolify UI
+- more info avaulable at ~/op/coolify
 
 - **File naming**: All filenames must use kebab-case (e.g., `contact-form.tsx`, `hero-section.tsx`)
 - **Explicit parameters**: Always require parameters explicitly in constructors and functions - it's better than guessing how someone will use it in the future
@@ -108,21 +95,24 @@ The following files/directories are intentionally **tracked in git** (not ignore
 
 ### Product
 
-**andocs** is a Confluence-like web application for managing and displaying markdown documentation. It allows teams to centralize documentation from multiple GitHub repositories in one place with navigation, search, and AI-assisted browsing.
+**Map Poster** is a web tool that generates personalized map posters from any location worldwide. Users enter a location, select a visual theme (17 available), and receive custom map artwork in seconds.
 
-**Product Roadmap:** `requirements/ROADMAP.md`
+**Target Audience:** Gift givers, home decorators, travelers commemorating memories.
+
+**Language:** Czech (UI and copy)
 
 ### Documentation
 
 The `docs/` folder contains important project documentation that should be respected:
 
-| Document | Description |
-|----------|-------------|
-| `docs/sales.md` | Marketing strategy, positioning, messaging guidelines, and sales objections |
-| `docs/design.md` | Design system, color palette, typography, components, and design decisions |
-| `docs/architecture.md` | Technical architecture overview |
+| Document               | Description                                                                 |
+| ---------------------- | --------------------------------------------------------------------------- |
+| `docs/sales.md`        | Marketing strategy, positioning, messaging guidelines, and sales objections |
+| `docs/design.md`       | Design system, color palette, typography, components, and design decisions  |
+| `docs/architecture.md` | Technical architecture overview                                             |
 
 **When working on:**
+
 - **Marketing copy, landing page, CTAs** → Read `docs/sales.md` first
 - **UI components, colors, fonts, styling** → Read `docs/design.md` first
 - **System design, infrastructure** → Read `docs/architecture.md` first
@@ -136,7 +126,47 @@ This is a full-stack monorepo built with:
 - **Better Auth**: Authentication and authorization
 - **PostgreSQL + Drizzle ORM**: Type-safe database access
 - **Effect**: Business logic and functional programming patterns
-- **Kubernetes + Docker**: Production deployment
+- **Docker Compose + Coolify**: Production deployment
+- **Python FastAPI** (`apps/api`): Map poster generation service
+
+### Map Poster API (`apps/api`)
+
+Python FastAPI service for generating map posters from OpenStreetMap data.
+
+**Stack:** Python 3.12, FastAPI, osmnx, geopandas, matplotlib
+
+**Architecture:**
+
+```
+POST /api/generate → Job Queue → ThreadPool (2 workers) → Poster Service → PNG
+                                        ↓
+                              OSMnx (Overpass API) ← main bottleneck
+```
+
+**Key Files:**
+
+- `app/main.py` - FastAPI entry point, health/themes endpoints
+- `app/routes/generate.py` - Generate endpoint with rate limiting (10/min)
+- `app/job_queue.py` - Async job queue with ThreadPoolExecutor
+- `app/poster_service.py` - Core rendering logic (OSM fetch + matplotlib)
+- `themes/` - 17 JSON theme definitions
+
+**Bottlenecks:**
+
+1. **Overpass API** - 3 HTTP calls per poster (streets, water, parks) + rate limiting delays
+2. **CPU rendering** - matplotlib projections take 5-30s depending on complexity
+3. **Serial processing** - Only 2 ThreadPoolExecutor workers
+
+**Local Development:**
+
+```bash
+cd apps/api
+uv sync                                      # Install dependencies
+uv run uvicorn app.main:app --reload --port 8000  # Run server
+uv run pytest                                # Run tests
+```
+
+**Caching:** File-based pickle cache in `cache/` directory. Clear with `rm -rf cache/*`.
 
 ### Tech Stack
 
@@ -522,13 +552,16 @@ opensrc/repos/github.com/<owner>/<repo>/
 ```
 
 **Configuration files** (tracked in git):
+
 - `opensrc/sources.json` - List of synced repositories and packages
 - `opensrc/settings.json` - Settings (allowFileModifications: false)
 
 **Source code** (git-ignored):
+
 - `opensrc/repos/` - Cloned repositories
 
 **Available sources** (see `opensrc/sources.json` for full list):
+
 - Effect, TanStack Router/Query/Start, TRPC, Drizzle ORM
 - Better Auth, Base UI, Tailwind docs, shadcn/ui
 - Sentry, Pino, Trigger.dev, and more
@@ -567,15 +600,14 @@ GOOD approach (opensrc first):
 
 ### CLI Tools
 
-| Tool         | Description                   | Common commands                                                                |
-| ------------ | ----------------------------- | ------------------------------------------------------------------------------ |
-| **opensrc**  | Fetch npm package source code | `bun run opensrc:sync` (after clone), `bun run opensrc:use <pkg>` (new pkg)   |
-| **az**       | Azure CLI                     | `az devops`, `az repos`, `az pipelines`, `az aks`                              |
-| **db-tool**  | Database queries              | `bun run tools/db-tool.ts --help` - see usage and schema introspection         |
-| **gh**       | GitHub CLI                    | `gh pr`, `gh issue`, `gh repo`, `gh api`                                       |
-| **git**      | Version control               | `git status`, `git diff`, `git log`, `git blame`                               |
-| **k8s-tool** | Kubernetes wrapper            | `bun run tools/k8s-tool.ts --help` - kubectl with correct cluster context      |
-| **logs-tool**| Application logs              | `bun run tools/logs-tool.ts --help` - read logs from local/test/prod           |
+| Tool          | Description                   | Common commands                                                             |
+| ------------- | ----------------------------- | --------------------------------------------------------------------------- |
+| **opensrc**   | Fetch npm package source code | `bun run opensrc:sync` (after clone), `bun run opensrc:use <pkg>` (new pkg) |
+| **az**        | Azure CLI                     | `az devops`, `az repos`, `az pipelines`, `az aks`                           |
+| **db-tool**   | Database queries              | `bun run tools/db-tool.ts --help` - see usage and schema introspection      |
+| **gh**        | GitHub CLI                    | `gh pr`, `gh issue`, `gh repo`, `gh api`                                    |
+| **git**       | Version control               | `git status`, `git diff`, `git log`, `git blame`                            |
+| **logs-tool** | Application logs              | `bun run tools/logs-tool.ts --help` - read logs from local/test/prod        |
 
 ### Tool Priority
 
@@ -687,11 +719,11 @@ bun run test:e2e          # Run E2E tests (Playwright)
 
 **Test file locations:**
 
-| Code Location                  | Test Location                            |
-| ------------------------------ | ---------------------------------------- |
-| `packages/X/src/file.ts`       | `packages/X/src/__tests__/file.test.ts`  |
-| TRPC routers                   | `apps/web-app/src/__tests__/*.test.ts`   |
-| Routes/UI                      | `apps/web-app/e2e/*.e2e.ts`              |
+| Code Location            | Test Location                           |
+| ------------------------ | --------------------------------------- |
+| `packages/X/src/file.ts` | `packages/X/src/__tests__/file.test.ts` |
+| TRPC routers             | `apps/web-app/src/__tests__/*.test.ts`  |
+| Routes/UI                | `apps/web-app/e2e/*.e2e.ts`             |
 
 **Decision process:** Always prefer unit tests. Ask user before writing TRPC integration or E2E tests.
 
@@ -755,19 +787,21 @@ Defined in `packages/db/src/schema.ts`:
 - Don't keep old code for backward compatibility
 - Don't create complex migration paths
 - Don't use `interface` when `type` works
+
   ```typescript
   // ❌ Bad - unnecessary interface
   interface UserProps {
     name: string;
     email: string;
   }
-  
+
   // ✅ Good - simple type alias
   type UserProps = {
     name: string;
     email: string;
   };
   ```
+
 - Don't create separate schema files for simple validations
 - Don't use classes for simple stateless functions
 - Don't create types manually when TRPC can infer them - ALWAYS use `RouterInputs`/`RouterOutputs`
@@ -775,12 +809,13 @@ Defined in `packages/db/src/schema.ts`:
 - Don't use relative imports - ALWAYS use absolute imports with `@/` or `@map-poster/*` (exception: test files in `__tests__/` can use relative imports for test utilities)
 - Don't use dynamic imports for types - NEVER use `import("../path").Type` syntax, always use regular static imports
 - Don't use default parameter values in function signatures - they hide dependencies and cause subtle bugs when callers forget to provide required values. Make parameters required and fix all call sites explicitly.
+
   ```typescript
   // ❌ Bad - default hides required dependency, caller forgets to pass it
-  function createIssue(title: string, source: Source = "default") { }
-  
+  function createIssue(title: string, source: Source = "default") {}
+
   // ✅ Good - caller must explicitly provide source
-  function createIssue(title: string, source: Source) { }
+  function createIssue(title: string, source: Source) {}
   ```
 
 ## 🔧 Production/Test Environment Troubleshooting
@@ -792,9 +827,9 @@ When user reports performance issues on test/production (not localhost):
 ### Investigation Steps
 
 1. **Sentry MCP** - Check traces for slow queries and external API latency
-2. **kubectl logs** - Review timing logs (`[Server]`, `[SSR]`, `[tRPC]`, `[DB Pool]`)
-3. **kubectl top pod** - Check CPU/memory usage (>70% = throttling)
-4. **kubectl get pod -o yaml** - Verify resource limits in pod/Helm values
+2. **Coolify logs** - Review service logs for web-app/api (`[Server]`, `[SSR]`, `[tRPC]`, `[DB Pool]`)
+3. **Server metrics** - Check CPU/memory usage in Coolify (or `docker stats` locally)
+4. **Configuration check** - Verify environment variables and container health in Coolify
 
 ### Common Causes
 
@@ -802,7 +837,3 @@ When user reports performance issues on test/production (not localhost):
 - Network latency (DNS, TCP to database)
 - DB connection pool issues (`idleTimeoutMillis` config)
 - Sequential external API calls (should be parallel)
-
-### Helm Values Files
-
-- `/kubernetes/helm/web-app/values.{test,prod}.yaml`

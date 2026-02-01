@@ -3,7 +3,7 @@ import {
   FaLinkedin,
   FaFacebook,
 } from "react-icons/fa";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/logo.svg";
 import { GradientBackground } from "@/shared/ui/gradient-background";
 
 const XIcon = () => (
@@ -25,15 +25,8 @@ const XIcon = () => (
 const Footer = () => {
   const sections = [
     {
-      title: "Product",
-      links: [{ name: "Home", href: "/" }],
-    },
-    {
-      title: "Company",
-      links: [
-        { name: "Newsroom", href: "/newsroom" },
-        { name: "Contact", href: "/contact" },
-      ],
+      title: "Produkt",
+      links: [{ name: "Vytvořit poster", href: "/" }],
     },
   ];
 
@@ -61,8 +54,8 @@ const Footer = () => {
   ];
 
   const legalLinks = [
-    { name: "Terms of Service", href: "/tos" },
-    { name: "Privacy Policy", href: "/privacy-policy" },
+    { name: "Obchodní podmínky", href: "/tos" },
+    { name: "Ochrana soukromí", href: "/privacy-policy" },
   ];
 
   return (
@@ -82,8 +75,8 @@ const Footer = () => {
               </h2>
             </div>
             <p className="text-muted-foreground max-w-full lg:max-w-[70%] text-sm text-center lg:text-left">
-              Production-ready full-stack template with
-              React 19, TanStack Start, and PostgreSQL.
+              Proměň svá oblíbená místa v umění.
+              Personalizované mapové postery za pár sekund.
             </p>
             <ul className="text-muted-foreground flex items-center justify-center lg:justify-start space-x-6">
               {socialLinks.map((social, idx) => (
@@ -128,8 +121,8 @@ const Footer = () => {
         </div>
         <div className="text-muted-foreground mt-8 flex flex-col justify-between gap-4 border-t py-8 text-xs font-medium md:flex-row md:items-center text-center md:text-left max-w-5xl mx-auto">
           <p className="order-2 lg:order-1">
-            © {new Date().getFullYear()} map-poster. All
-            rights reserved.
+            © {new Date().getFullYear()} Map Poster. Všechna
+            práva vyhrazena.
           </p>
           <ul className="order-1 flex flex-col gap-2 md:order-2 md:flex-row md:gap-4 items-center">
             {legalLinks.map((link, idx) => (

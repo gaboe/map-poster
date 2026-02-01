@@ -131,14 +131,12 @@ export function UserManagement() {
         totalUsers: 0,
         adminUsers: 0,
         activeUsersLast24h: 0,
-        totalOrganizations: 0,
       };
     }
     return {
       totalUsers: statsData.totalUsers,
       adminUsers: statsData.adminUsersCount,
       activeUsersLast24h: statsData.activeUsersLast24h,
-      totalOrganizations: statsData.totalOrganizations,
     };
   }, [statsData]);
 
@@ -409,7 +407,7 @@ export function UserManagement() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
         <Card className="p-3">
           <div className="text-xs font-medium text-muted-foreground">
             Total Users
@@ -426,14 +424,7 @@ export function UserManagement() {
             {stats.adminUsers}
           </div>
         </Card>
-        <Card className="p-3">
-          <div className="text-xs font-medium text-muted-foreground">
-            Organizations
-          </div>
-          <div className="text-lg font-bold">
-            {stats.totalOrganizations}
-          </div>
-        </Card>
+
         <Card className="p-3">
           <div className="text-xs font-medium text-muted-foreground">
             Active Users (24h)

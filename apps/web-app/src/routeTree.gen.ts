@@ -16,7 +16,6 @@ import { Route as AppRouteRouteImport } from './routes/app/route'
 import { Route as WebRouteRouteImport } from './routes/_web/route'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as WebIndexRouteImport } from './routes/_web/index'
-import { Route as InvitationsIdRouteImport } from './routes/invitations/$id'
 import { Route as AppDashboardRouteImport } from './routes/app/dashboard'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as WebTosRouteImport } from './routes/_web/tos'
@@ -25,14 +24,10 @@ import { Route as WebPrivacyPolicyRouteImport } from './routes/_web/privacy-poli
 import { Route as AppAdminRouteRouteImport } from './routes/app/admin/route'
 import { Route as AppAdminIndexRouteImport } from './routes/app/admin/index'
 import { Route as AppAdminUsersRouteImport } from './routes/app/admin/users'
+import { Route as AppAdminOsmDataRouteImport } from './routes/app/admin/osm-data'
 import { Route as AppAdminObservabilityRouteImport } from './routes/app/admin/observability'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api/trpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
-import { Route as AppProjectIdIndexRouteImport } from './routes/app/project/$id/index'
-import { Route as AppOrganizationIdIndexRouteImport } from './routes/app/organization/$id/index'
-import { Route as AppProjectIdSettingsRouteImport } from './routes/app/project/$id/settings'
-import { Route as AppOrganizationIdSettingsRouteImport } from './routes/app/organization/$id/settings'
-import { Route as AppOrganizationIdMembersRouteImport } from './routes/app/organization/$id/members'
 import { Route as ApiOgPageSlugRouteImport } from './routes/api/og/page/$slug'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -68,11 +63,6 @@ const WebIndexRoute = WebIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => WebRouteRoute,
-} as any)
-const InvitationsIdRoute = InvitationsIdRouteImport.update({
-  id: '/invitations/$id',
-  path: '/invitations/$id',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
@@ -114,6 +104,11 @@ const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AppAdminRouteRoute,
 } as any)
+const AppAdminOsmDataRoute = AppAdminOsmDataRouteImport.update({
+  id: '/osm-data',
+  path: '/osm-data',
+  getParentRoute: () => AppAdminRouteRoute,
+} as any)
 const AppAdminObservabilityRoute = AppAdminObservabilityRouteImport.update({
   id: '/observability',
   path: '/observability',
@@ -129,33 +124,6 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppProjectIdIndexRoute = AppProjectIdIndexRouteImport.update({
-  id: '/project/$id/',
-  path: '/project/$id/',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppOrganizationIdIndexRoute = AppOrganizationIdIndexRouteImport.update({
-  id: '/organization/$id/',
-  path: '/organization/$id/',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppProjectIdSettingsRoute = AppProjectIdSettingsRouteImport.update({
-  id: '/project/$id/settings',
-  path: '/project/$id/settings',
-  getParentRoute: () => AppRouteRoute,
-} as any)
-const AppOrganizationIdSettingsRoute =
-  AppOrganizationIdSettingsRouteImport.update({
-    id: '/organization/$id/settings',
-    path: '/organization/$id/settings',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
-const AppOrganizationIdMembersRoute =
-  AppOrganizationIdMembersRouteImport.update({
-    id: '/organization/$id/members',
-    path: '/organization/$id/members',
-    getParentRoute: () => AppRouteRoute,
-  } as any)
 const ApiOgPageSlugRoute = ApiOgPageSlugRouteImport.update({
   id: '/api/og/page/$slug',
   path: '/api/og/page/$slug',
@@ -174,19 +142,14 @@ export interface FileRoutesByFullPath {
   '/tos': typeof WebTosRoute
   '/api/health': typeof ApiHealthRoute
   '/app/dashboard': typeof AppDashboardRoute
-  '/invitations/$id': typeof InvitationsIdRoute
   '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/app/admin/observability': typeof AppAdminObservabilityRoute
+  '/app/admin/osm-data': typeof AppAdminOsmDataRoute
   '/app/admin/users': typeof AppAdminUsersRoute
   '/app/admin/': typeof AppAdminIndexRoute
   '/api/og/page/$slug': typeof ApiOgPageSlugRoute
-  '/app/organization/$id/members': typeof AppOrganizationIdMembersRoute
-  '/app/organization/$id/settings': typeof AppOrganizationIdSettingsRoute
-  '/app/project/$id/settings': typeof AppProjectIdSettingsRoute
-  '/app/organization/$id/': typeof AppOrganizationIdIndexRoute
-  '/app/project/$id/': typeof AppProjectIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
@@ -197,20 +160,15 @@ export interface FileRoutesByTo {
   '/tos': typeof WebTosRoute
   '/api/health': typeof ApiHealthRoute
   '/app/dashboard': typeof AppDashboardRoute
-  '/invitations/$id': typeof InvitationsIdRoute
   '/': typeof WebIndexRoute
   '/app': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/app/admin/observability': typeof AppAdminObservabilityRoute
+  '/app/admin/osm-data': typeof AppAdminOsmDataRoute
   '/app/admin/users': typeof AppAdminUsersRoute
   '/app/admin': typeof AppAdminIndexRoute
   '/api/og/page/$slug': typeof ApiOgPageSlugRoute
-  '/app/organization/$id/members': typeof AppOrganizationIdMembersRoute
-  '/app/organization/$id/settings': typeof AppOrganizationIdSettingsRoute
-  '/app/project/$id/settings': typeof AppProjectIdSettingsRoute
-  '/app/organization/$id': typeof AppOrganizationIdIndexRoute
-  '/app/project/$id': typeof AppProjectIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -225,20 +183,15 @@ export interface FileRoutesById {
   '/_web/tos': typeof WebTosRoute
   '/api/health': typeof ApiHealthRoute
   '/app/dashboard': typeof AppDashboardRoute
-  '/invitations/$id': typeof InvitationsIdRoute
   '/_web/': typeof WebIndexRoute
   '/app/': typeof AppIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/app/admin/observability': typeof AppAdminObservabilityRoute
+  '/app/admin/osm-data': typeof AppAdminOsmDataRoute
   '/app/admin/users': typeof AppAdminUsersRoute
   '/app/admin/': typeof AppAdminIndexRoute
   '/api/og/page/$slug': typeof ApiOgPageSlugRoute
-  '/app/organization/$id/members': typeof AppOrganizationIdMembersRoute
-  '/app/organization/$id/settings': typeof AppOrganizationIdSettingsRoute
-  '/app/project/$id/settings': typeof AppProjectIdSettingsRoute
-  '/app/organization/$id/': typeof AppOrganizationIdIndexRoute
-  '/app/project/$id/': typeof AppProjectIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -254,19 +207,14 @@ export interface FileRouteTypes {
     | '/tos'
     | '/api/health'
     | '/app/dashboard'
-    | '/invitations/$id'
     | '/app/'
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/app/admin/observability'
+    | '/app/admin/osm-data'
     | '/app/admin/users'
     | '/app/admin/'
     | '/api/og/page/$slug'
-    | '/app/organization/$id/members'
-    | '/app/organization/$id/settings'
-    | '/app/project/$id/settings'
-    | '/app/organization/$id/'
-    | '/app/project/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/sign-in'
@@ -277,20 +225,15 @@ export interface FileRouteTypes {
     | '/tos'
     | '/api/health'
     | '/app/dashboard'
-    | '/invitations/$id'
     | '/'
     | '/app'
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/app/admin/observability'
+    | '/app/admin/osm-data'
     | '/app/admin/users'
     | '/app/admin'
     | '/api/og/page/$slug'
-    | '/app/organization/$id/members'
-    | '/app/organization/$id/settings'
-    | '/app/project/$id/settings'
-    | '/app/organization/$id'
-    | '/app/project/$id'
   id:
     | '__root__'
     | '/_web'
@@ -304,20 +247,15 @@ export interface FileRouteTypes {
     | '/_web/tos'
     | '/api/health'
     | '/app/dashboard'
-    | '/invitations/$id'
     | '/_web/'
     | '/app/'
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/app/admin/observability'
+    | '/app/admin/osm-data'
     | '/app/admin/users'
     | '/app/admin/'
     | '/api/og/page/$slug'
-    | '/app/organization/$id/members'
-    | '/app/organization/$id/settings'
-    | '/app/project/$id/settings'
-    | '/app/organization/$id/'
-    | '/app/project/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -327,7 +265,6 @@ export interface RootRouteChildren {
   SignUpRoute: typeof SignUpRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiHealthRoute: typeof ApiHealthRoute
-  InvitationsIdRoute: typeof InvitationsIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
   ApiOgPageSlugRoute: typeof ApiOgPageSlugRoute
@@ -383,13 +320,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof WebIndexRouteImport
       parentRoute: typeof WebRouteRoute
-    }
-    '/invitations/$id': {
-      id: '/invitations/$id'
-      path: '/invitations/$id'
-      fullPath: '/invitations/$id'
-      preLoaderRoute: typeof InvitationsIdRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/app/dashboard': {
       id: '/app/dashboard'
@@ -447,6 +377,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminUsersRouteImport
       parentRoute: typeof AppAdminRouteRoute
     }
+    '/app/admin/osm-data': {
+      id: '/app/admin/osm-data'
+      path: '/osm-data'
+      fullPath: '/app/admin/osm-data'
+      preLoaderRoute: typeof AppAdminOsmDataRouteImport
+      parentRoute: typeof AppAdminRouteRoute
+    }
     '/app/admin/observability': {
       id: '/app/admin/observability'
       path: '/observability'
@@ -467,41 +404,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/app/project/$id/': {
-      id: '/app/project/$id/'
-      path: '/project/$id'
-      fullPath: '/app/project/$id/'
-      preLoaderRoute: typeof AppProjectIdIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/organization/$id/': {
-      id: '/app/organization/$id/'
-      path: '/organization/$id'
-      fullPath: '/app/organization/$id/'
-      preLoaderRoute: typeof AppOrganizationIdIndexRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/project/$id/settings': {
-      id: '/app/project/$id/settings'
-      path: '/project/$id/settings'
-      fullPath: '/app/project/$id/settings'
-      preLoaderRoute: typeof AppProjectIdSettingsRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/organization/$id/settings': {
-      id: '/app/organization/$id/settings'
-      path: '/organization/$id/settings'
-      fullPath: '/app/organization/$id/settings'
-      preLoaderRoute: typeof AppOrganizationIdSettingsRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
-    '/app/organization/$id/members': {
-      id: '/app/organization/$id/members'
-      path: '/organization/$id/members'
-      fullPath: '/app/organization/$id/members'
-      preLoaderRoute: typeof AppOrganizationIdMembersRouteImport
-      parentRoute: typeof AppRouteRoute
     }
     '/api/og/page/$slug': {
       id: '/api/og/page/$slug'
@@ -533,12 +435,14 @@ const WebRouteRouteWithChildren = WebRouteRoute._addFileChildren(
 
 interface AppAdminRouteRouteChildren {
   AppAdminObservabilityRoute: typeof AppAdminObservabilityRoute
+  AppAdminOsmDataRoute: typeof AppAdminOsmDataRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
   AppAdminIndexRoute: typeof AppAdminIndexRoute
 }
 
 const AppAdminRouteRouteChildren: AppAdminRouteRouteChildren = {
   AppAdminObservabilityRoute: AppAdminObservabilityRoute,
+  AppAdminOsmDataRoute: AppAdminOsmDataRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
   AppAdminIndexRoute: AppAdminIndexRoute,
 }
@@ -551,22 +455,12 @@ interface AppRouteRouteChildren {
   AppAdminRouteRoute: typeof AppAdminRouteRouteWithChildren
   AppDashboardRoute: typeof AppDashboardRoute
   AppIndexRoute: typeof AppIndexRoute
-  AppOrganizationIdMembersRoute: typeof AppOrganizationIdMembersRoute
-  AppOrganizationIdSettingsRoute: typeof AppOrganizationIdSettingsRoute
-  AppProjectIdSettingsRoute: typeof AppProjectIdSettingsRoute
-  AppOrganizationIdIndexRoute: typeof AppOrganizationIdIndexRoute
-  AppProjectIdIndexRoute: typeof AppProjectIdIndexRoute
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAdminRouteRoute: AppAdminRouteRouteWithChildren,
   AppDashboardRoute: AppDashboardRoute,
   AppIndexRoute: AppIndexRoute,
-  AppOrganizationIdMembersRoute: AppOrganizationIdMembersRoute,
-  AppOrganizationIdSettingsRoute: AppOrganizationIdSettingsRoute,
-  AppProjectIdSettingsRoute: AppProjectIdSettingsRoute,
-  AppOrganizationIdIndexRoute: AppOrganizationIdIndexRoute,
-  AppProjectIdIndexRoute: AppProjectIdIndexRoute,
 }
 
 const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
@@ -580,7 +474,6 @@ const rootRouteChildren: RootRouteChildren = {
   SignUpRoute: SignUpRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiHealthRoute: ApiHealthRoute,
-  InvitationsIdRoute: InvitationsIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
   ApiOgPageSlugRoute: ApiOgPageSlugRoute,

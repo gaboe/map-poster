@@ -140,6 +140,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Python API
+apps/api/cache/
+uv.lock
+
 # Sentry Config File
 .sentryclirc
 

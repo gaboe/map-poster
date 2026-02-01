@@ -20,7 +20,7 @@ interface IpApiResponse {
 const PRAGUE_DEFAULT = {
   lat: 50.0755,
   lon: 14.4378,
-  city: "Prague, Czech Republic",
+  city: "Praha",
 };
 
 /**
@@ -46,7 +46,7 @@ function getBrowserGeolocation(): Effect.Effect<
           resolve({
             lat: position.coords.latitude,
             lon: position.coords.longitude,
-            city: "Current Location",
+            city: "Tvoje poloha",
           });
         },
         (error) => {

@@ -352,7 +352,7 @@ def _bbox_from_point(
     point: Tuple[float, float], dist: int
 ) -> Tuple[float, float, float, float]:
     north, south, east, west = ox.utils_geo.bbox_from_point(point, dist)
-    return west, south, east, north
+    return float(west), float(south), float(east), float(north)
 
 
 def is_location_available(point: Tuple[float, float], dist: int) -> bool:
@@ -401,6 +401,9 @@ def fetch_graph_postgis(
 
         graph = _build_graph_from_lines(lines)
         if graph is None:
+            print(
+                f"[PostGIS] _build_graph_from_lines returned None for point={point}, dist={dist}"
+            )
             return None
 
         try:
@@ -409,7 +412,8 @@ def fetch_graph_postgis(
             pass
 
         return graph
-    except Exception:
+    except Exception as e:
+        print(f"[PostGIS] fetch_graph_postgis failed: {e}")
         return None
 
 

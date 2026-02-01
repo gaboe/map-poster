@@ -103,10 +103,10 @@ CheckCodeQuality → Build → Pre-Deployment → Web App → Post-Deployment �
 | **CheckCodeQuality**   | Lint, typecheck, format check, unit tests with coverage    |
 | **Build**              | Docker images for web-app, pre-deployment, post-deployment |
 | **Pre-Deployment**     | Database migrations                                        |
-| **Web App Deployment** | Deploy to Kubernetes                                       |
+| **Web App Deployment** | Deploy to Coolify                                          |
 | **Post-Deployment**    | Seed data, cleanup tasks                                   |
 | **Build E2E Runner**   | Build Playwright Docker image                              |
-| **E2E Tests**          | Run Playwright tests in Kubernetes                         |
+| **E2E Tests**          | Run Playwright tests in CI containers                      |
 
 ### Test Reports in Azure DevOps
 
@@ -231,72 +231,13 @@ bun run dev
 
 ### Setting Up Admin User
 
-To grant admin privileges to a user, run the following PostgreSQL script. This script uses Better Auth's organization system to make a user an admin.
+To grant admin privileges to a user:
 
 ```sql
--- PostgreSQL script to set admin role for a user
--- Using Better Auth organization system with roles from packages/common/src/access-rights/models.ts
-
-DO $$
-DECLARE
-    TARGET_EMAIL CONSTANT TEXT := 'user@example.com'; -- REPLACE WITH ACTUAL EMAIL
-    TARGET_USER_ID TEXT;
-    DEFAULT_ORG_ID TEXT;
-BEGIN
-    -- 1. Get the user ID
-    SELECT id INTO TARGET_USER_ID
-    FROM users
-    WHERE email = TARGET_EMAIL;
-
-    IF TARGET_USER_ID IS NULL THEN
-        RAISE EXCEPTION 'User with email % not found', TARGET_EMAIL;
-    END IF;
-
-    -- 2. Set Better Auth global admin role (optional - for system-wide admin access)
-    UPDATE users
-    SET role = 'admin' -- Global admin role
-    WHERE email = TARGET_EMAIL;
-
-    -- 3. Find user's first organization or create one
-    SELECT o.id INTO DEFAULT_ORG_ID
-    FROM organizations o
-    INNER JOIN members m ON o.id = m.organization_id
-    WHERE m.user_id = TARGET_USER_ID
-    ORDER BY o.created_at
-    LIMIT 1;
-
-    -- If user has no organizations, create a default one
-    IF DEFAULT_ORG_ID IS NULL THEN
-        INSERT INTO organizations (name)
-        VALUES (format('%s''s Organization',
-                       (SELECT name FROM users WHERE id = TARGET_USER_ID)))
-        RETURNING id INTO DEFAULT_ORG_ID;
-
-        -- Add user as owner to the new organization
-        INSERT INTO members (user_id, organization_id, role)
-        VALUES (TARGET_USER_ID, DEFAULT_ORG_ID, 'owner'); -- Roles.Owner
-    ELSE
-        -- Update existing membership to owner role
-        UPDATE members
-        SET role = 'owner' -- Roles.Owner
-        WHERE user_id = TARGET_USER_ID
-          AND organization_id = DEFAULT_ORG_ID;
-    END IF;
-
-    RAISE NOTICE 'Admin setup completed for user: % (ID: %)', TARGET_EMAIL, TARGET_USER_ID;
-    RAISE NOTICE 'User is now owner of organization: %', DEFAULT_ORG_ID;
-    RAISE NOTICE 'Global admin role set: admin';
-END $$;
+UPDATE users SET role = 'admin' WHERE email = 'user@example.com';
 ```
 
-**Usage:**
-
-1. Replace `'user@example.com'` in `TARGET_EMAIL` constant with the actual user email
-2. Run the script in your PostgreSQL client (PostgreSQL CLI, pgAdmin, etc.)
-3. The script will:
-   - Set the user's global role to `admin` in the `users` table
-   - Make the user an `owner` of their organization (or create one if needed)
-   - Grant full access to organization resources
+Replace `'user@example.com'` with the actual user email.
 
 ## Versioning & Changelog
 

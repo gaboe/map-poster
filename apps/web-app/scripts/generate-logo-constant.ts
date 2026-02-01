@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 
-const LOGO_PATH = `${process.cwd()}/src/assets/logo.png`;
+const LOGO_PATH = `${process.cwd()}/src/assets/logo.svg`;
 const OUTPUT_PATH = `${process.cwd()}/src/generated/logo-base64.ts`;
 
 try {
@@ -8,7 +8,7 @@ try {
   const logoFile = Bun.file(LOGO_PATH);
   const logoBuffer = await logoFile.arrayBuffer();
   const base64 = Buffer.from(logoBuffer).toString("base64");
-  const dataUrl = `data:image/png;base64,${base64}`;
+  const dataUrl = `data:image/svg+xml;base64,${base64}`;
 
   // Create output directory if it doesn't exist
   const outputDir = dirname(OUTPUT_PATH);

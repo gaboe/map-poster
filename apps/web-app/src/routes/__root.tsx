@@ -104,9 +104,11 @@ export const Route = createRootRouteWithContext<{
         content: "width=device-width, initial-scale=1",
       },
       ...seo({
-        title: "map-poster",
-        description: "map-poster",
-        keywords: "map-poster",
+        title: "Tady Bydlíme",
+        description:
+          "Personalizovaný mapový poster za pár sekund",
+        keywords:
+          "mapový poster, mapa města, vlastní mapa, tadybydlime",
         image: `${env.VITE_BASE_URL}/api/og/page/homepage.png`,
         logo: `${env.VITE_BASE_URL}/favicon.svg`,
       }),
@@ -135,7 +137,8 @@ export const Route = createRootRouteWithContext<{
       },
       {
         rel: "icon",
-        href: "/favicon.ico",
+        type: "image/svg+xml",
+        href: "/favicon.svg",
       },
       ...getCanonicalLinks(env.VITE_BASE_URL),
     ],

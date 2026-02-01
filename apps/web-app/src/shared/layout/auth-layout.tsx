@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/logo.svg";
 import { GradientBackground } from "@/shared/ui/gradient-background";
 
 type Props = {

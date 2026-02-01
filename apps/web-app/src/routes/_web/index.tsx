@@ -6,32 +6,31 @@ import {
   useQuery,
 } from "@tanstack/react-query";
 import { Card, CardContent } from "@/shared/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/ui/select";
 import { Input } from "@/shared/ui/input";
 import { Button } from "@/shared/ui/button";
 import { seo, getCanonicalLinks } from "@/utils/seo";
 import { env } from "@/env/client";
 import { WebLayout } from "@/web/layout/web-layout";
-import { useState, useEffect } from "react";
-import { MapPinIcon, SparklesIcon } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import {
+  MapPinIcon,
+  SparklesIcon,
+  CheckIcon,
+} from "lucide-react";
 import { useGeolocation } from "@/map-poster/hooks/use-geolocation";
+import logoSvg from "@/assets/logo.svg";
 
 export const Route = createFileRoute("/_web/")({
   component: Home,
   head: () => ({
     meta: [
       ...seo({
-        title: "Map Poster - Create Stunning Map Art",
+        title:
+          "Tady Bydlíme - Personalizovaný mapový poster",
         description:
-          "Create stunning, personalized map posters of any location. Choose from 17 beautiful themes and generate your custom city map in seconds.",
+          "Vytvoř si nádherný mapový poster svého oblíbeného místa. Vyber si z 17 unikátních témat a vygeneruj vlastní mapu během pár sekund.",
         keywords:
-          "map poster, city map, custom map, map art, location poster, cartography",
+          "mapový poster, mapa města, vlastní mapa, mapové umění, plakát lokace, tadybydlime",
         canonical: env.VITE_BASE_URL,
         image: `${env.VITE_BASE_URL}/api/og/page/homepage.png`,
       }),
@@ -40,24 +39,231 @@ export const Route = createFileRoute("/_web/")({
   }),
 });
 
+type DesignTheme = "warm" | "playful" | "nordic" | "mono";
+
+type ThemeConfig = {
+  name: string;
+  emoji: string;
+  colors: {
+    bgGradient: string;
+    cardBg: string;
+    cardBorder: string;
+    headlineText: string;
+    bodyText: string;
+    mutedText: string;
+    primaryButton: string;
+    primaryButtonHover: string;
+    accentBg: string;
+    accentText: string;
+    inputBorder: string;
+    inputFocus: string;
+    selectedBorder: string;
+    selectedRing: string;
+  };
+};
+
+const themes: Record<DesignTheme, ThemeConfig> = {
+  warm: {
+    name: "Teplý",
+    emoji: "🌅",
+    colors: {
+      bgGradient: "from-amber-50 via-stone-50 to-orange-50",
+      cardBg: "bg-white/80 backdrop-blur-sm",
+      cardBorder: "border-stone-200",
+      headlineText: "text-stone-900",
+      bodyText: "text-stone-600",
+      mutedText: "text-stone-500",
+      primaryButton: "bg-amber-600 hover:bg-amber-700",
+      primaryButtonHover: "hover:bg-amber-700",
+      accentBg: "bg-amber-100",
+      accentText: "text-amber-700",
+      inputBorder: "border-stone-300",
+      inputFocus: "focus:border-amber-500",
+      selectedBorder: "border-amber-600",
+      selectedRing: "ring-amber-600/20",
+    },
+  },
+  playful: {
+    name: "Hravý",
+    emoji: "🎨",
+    colors: {
+      bgGradient: "from-rose-50 via-pink-50 to-coral-50",
+      cardBg: "bg-white/90 backdrop-blur-sm",
+      cardBorder: "border-rose-200",
+      headlineText: "text-rose-900",
+      bodyText: "text-rose-700",
+      mutedText: "text-rose-500",
+      primaryButton:
+        "bg-gradient-to-r from-coral-500 to-rose-500 hover:from-coral-600 hover:to-rose-600",
+      primaryButtonHover:
+        "hover:from-coral-600 hover:to-rose-600",
+      accentBg: "bg-rose-100",
+      accentText: "text-rose-700",
+      inputBorder: "border-rose-300",
+      inputFocus: "focus:border-rose-500",
+      selectedBorder: "border-rose-600",
+      selectedRing: "ring-rose-600/20",
+    },
+  },
+  nordic: {
+    name: "Severský",
+    emoji: "🌲",
+    colors: {
+      bgGradient:
+        "from-slate-100 via-gray-100 to-slate-200",
+      cardBg: "bg-white/70 backdrop-blur-sm",
+      cardBorder: "border-slate-300",
+      headlineText: "text-slate-900",
+      bodyText: "text-slate-700",
+      mutedText: "text-slate-500",
+      primaryButton: "bg-slate-800 hover:bg-slate-900",
+      primaryButtonHover: "hover:bg-slate-900",
+      accentBg: "bg-slate-200",
+      accentText: "text-slate-800",
+      inputBorder: "border-slate-400",
+      inputFocus: "focus:border-slate-600",
+      selectedBorder: "border-slate-700",
+      selectedRing: "ring-slate-700/20",
+    },
+  },
+  mono: {
+    name: "Mono",
+    emoji: "⚫",
+    colors: {
+      bgGradient: "from-white via-gray-50 to-white",
+      cardBg: "bg-white border-2",
+      cardBorder: "border-black",
+      headlineText: "text-black",
+      bodyText: "text-gray-800",
+      mutedText: "text-gray-600",
+      primaryButton: "bg-black hover:bg-gray-800",
+      primaryButtonHover: "hover:bg-gray-800",
+      accentBg: "bg-gray-100",
+      accentText: "text-black",
+      inputBorder: "border-black",
+      inputFocus:
+        "focus:border-black focus:ring-2 focus:ring-black",
+      selectedBorder: "border-black border-4",
+      selectedRing: "ring-black/30",
+    },
+  },
+};
+
+function ThemeSwitcher({
+  currentTheme,
+  onThemeChange,
+}: {
+  currentTheme: DesignTheme;
+  onThemeChange: (theme: DesignTheme) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const theme = themes[currentTheme];
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50">
+      {isExpanded ? (
+        <div className="bg-white rounded-2xl shadow-2xl border-2 border-stone-200 p-4">
+          <div className="mb-3 text-center">
+            <p className="text-sm font-semibold text-stone-700">
+              Vyber téma
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {(Object.keys(themes) as DesignTheme[]).map(
+              (themeKey) => {
+                const t = themes[themeKey];
+                const isSelected =
+                  themeKey === currentTheme;
+                return (
+                  <button
+                    key={themeKey}
+                    onClick={() => {
+                      onThemeChange(themeKey);
+                      setIsExpanded(false);
+                    }}
+                    className={`
+                    relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl
+                    border-2 transition-all duration-200
+                    ${isSelected ? "border-stone-900 bg-stone-50 shadow-md" : "border-stone-200 hover:border-stone-400 hover:bg-stone-50"}
+                  `}
+                  >
+                    <span className="text-3xl">
+                      {t.emoji}
+                    </span>
+                    <span className="text-xs font-medium text-stone-700">
+                      {t.name}
+                    </span>
+                    {isSelected && (
+                      <div className="absolute top-2 right-2">
+                        <CheckIcon className="size-4 text-stone-900" />
+                      </div>
+                    )}
+                  </button>
+                );
+              }
+            )}
+          </div>
+          <button
+            onClick={() => setIsExpanded(false)}
+            className="mt-3 w-full text-xs text-stone-500 hover:text-stone-700 transition-colors"
+          >
+            Zavřít
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setIsExpanded(true)}
+          className="flex items-center gap-2 px-4 py-3 bg-white rounded-full shadow-lg border-2 border-stone-200 hover:shadow-xl hover:border-stone-300 transition-all duration-200"
+        >
+          <span className="text-xl">{theme.emoji}</span>
+          <span className="text-sm font-medium text-stone-700">
+            {theme.name}
+          </span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Home() {
   const trpc = useTRPC();
   const geolocation = useGeolocation();
 
-  const { data: themes } = useSuspenseQuery(
+  const { data: posterThemes } = useSuspenseQuery(
     trpc.mapPoster.listThemes.queryOptions()
   );
 
-  const [selectedTheme, setSelectedTheme] =
+  const [designTheme, setDesignTheme] =
+    useState<DesignTheme>("warm");
+  const [selectedPosterTheme, setSelectedPosterTheme] =
     useState<string>("");
   const [location, setLocation] = useState("");
   const [jobId, setJobId] = useState<string | null>(null);
+  const hasAutoGenerated = useRef(false);
 
   useEffect(() => {
-    if (themes.length > 0 && !selectedTheme && themes[0]) {
-      setSelectedTheme(themes[0].id);
+    const savedTheme = localStorage.getItem(
+      "map-poster-design-theme"
+    );
+    if (savedTheme && savedTheme in themes) {
+      setDesignTheme(savedTheme as DesignTheme);
     }
-  }, [themes, selectedTheme]);
+  }, []);
+
+  const handleThemeChange = (theme: DesignTheme) => {
+    setDesignTheme(theme);
+    localStorage.setItem("map-poster-design-theme", theme);
+  };
+
+  useEffect(() => {
+    if (
+      posterThemes.length > 0 &&
+      !selectedPosterTheme &&
+      posterThemes[0]
+    ) {
+      setSelectedPosterTheme(posterThemes[0].id);
+    }
+  }, [posterThemes, selectedPosterTheme]);
 
   useEffect(() => {
     if (
@@ -80,6 +286,30 @@ function Home() {
     })
   );
 
+  useEffect(() => {
+    if (
+      !hasAutoGenerated.current &&
+      geolocation.status === "success" &&
+      geolocation.lat !== undefined &&
+      geolocation.lon !== undefined &&
+      selectedPosterTheme &&
+      !generateMutation.isPending
+    ) {
+      hasAutoGenerated.current = true;
+      generateMutation.mutate({
+        lat: geolocation.lat,
+        lon: geolocation.lon,
+        theme: selectedPosterTheme,
+      });
+    }
+  }, [
+    geolocation.status,
+    geolocation.lat,
+    geolocation.lon,
+    selectedPosterTheme,
+    generateMutation,
+  ]);
+
   const { data: status } = useQuery({
     ...trpc.mapPoster.getStatus.queryOptions({
       jobId: jobId ?? "",
@@ -99,12 +329,12 @@ function Home() {
   });
 
   const handleGenerate = () => {
-    if (!location || !selectedTheme) return;
+    if (!location || !selectedPosterTheme) return;
 
     generateMutation.mutate({
       lat: geolocation.lat,
       lon: geolocation.lon,
-      theme: selectedTheme,
+      theme: selectedPosterTheme,
     });
   };
 
@@ -113,208 +343,231 @@ function Home() {
     status?.status === "pending" ||
     status?.status === "processing";
 
+  const currentTheme = themes[designTheme];
+
   return (
     <WebLayout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 dark:from-slate-950 dark:via-blue-950 dark:to-slate-900">
-        <div className="container mx-auto px-4 pt-16 pb-8">
-          <div className="text-center mb-12 space-y-4">
-            <h1 className="text-6xl md:text-7xl font-bold tracking-tight bg-gradient-to-br from-slate-900 via-blue-800 to-slate-700 dark:from-slate-100 dark:via-blue-200 dark:to-slate-300 bg-clip-text text-transparent">
-              Create Your
-              <br />
-              Perfect Map Poster
-            </h1>
-            <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-              Transform any location into stunning wall art.
-              Choose from 17 unique themes and watch your
-              map come to life.
+      <div
+        className={`min-h-screen bg-gradient-to-br ${currentTheme.colors.bgGradient} transition-colors duration-500`}
+      >
+        <div className="container mx-auto px-4 pt-8 pb-4">
+          <div className="text-center mb-6 space-y-2">
+            <img
+              src={logoSvg}
+              alt="Tady Bydlíme"
+              className="size-20 mx-auto"
+            />
+            <p
+              className={`text-sm ${currentTheme.colors.bodyText} max-w-md mx-auto transition-colors duration-500`}
+            >
+              Personalizovaný mapový poster za pár sekund
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-[1fr_400px] gap-8 max-w-7xl mx-auto">
-            <div className="order-2 lg:order-1">
-              <Card className="overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-2xl">
-                <CardContent className="p-0">
-                  <div className="aspect-[3/4] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 relative overflow-hidden">
-                    {isGenerating ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-8 space-y-6">
-                        <div className="absolute inset-0 opacity-10">
-                          <div
-                            className="absolute inset-0"
-                            style={{
-                              backgroundImage: `
+          <div className="grid lg:grid-cols-2 gap-8 max-w-6xl mx-auto items-stretch">
+            <div className="order-2 lg:order-1 flex h-full">
+              <div
+                className={`overflow-hidden border-2 rounded-xl ${currentTheme.colors.cardBorder} shadow-2xl transition-all duration-500 flex-1 h-full min-h-[320px] bg-gradient-to-br from-stone-100 to-stone-200 relative flex items-center justify-center`}
+              >
+                {isGenerating ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 space-y-4">
+                    <div className="absolute inset-0 opacity-10">
+                      <div
+                        className="absolute inset-0"
+                        style={{
+                          backgroundImage: `
                                 linear-gradient(to right, currentColor 1px, transparent 1px),
                                 linear-gradient(to bottom, currentColor 1px, transparent 1px)
                               `,
-                              backgroundSize: "40px 40px",
-                            }}
-                          />
-                        </div>
-                        <div className="relative z-10 text-center space-y-4">
-                          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-500/20 animate-pulse">
-                            <MapPinIcon className="size-10 text-blue-600 dark:text-blue-400" />
-                          </div>
-                          <div className="space-y-2">
-                            <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                              Generating Your Map
-                            </h3>
-                            <p className="text-slate-600 dark:text-slate-400">
-                              {status?.status ===
-                              "processing"
-                                ? `${status.progress}% complete`
-                                : "Preparing your poster..."}
-                            </p>
-                          </div>
-                          <div className="w-64 h-2 bg-slate-300 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500 ease-out"
-                              style={{
-                                width: `${status?.progress ?? 0}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ) : status?.url ? (
-                      <img
-                        src={status.url}
-                        alt="Generated map poster"
-                        className="w-full h-full object-cover"
-                        data-testid="poster-preview"
+                          backgroundSize: "40px 40px",
+                        }}
                       />
-                    ) : (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                    </div>
+                    <div className="relative z-10 text-center space-y-3">
+                      <div
+                        className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${currentTheme.colors.accentBg} animate-pulse transition-colors duration-500`}
+                      >
+                        <MapPinIcon
+                          className={`size-8 ${currentTheme.colors.accentText} transition-colors duration-500`}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <h3
+                          className={`text-xl font-bold ${currentTheme.colors.headlineText} transition-colors duration-500`}
+                        >
+                          Generuji Tvou Mapu
+                        </h3>
+                        <p
+                          className={`${currentTheme.colors.bodyText} transition-colors duration-500`}
+                        >
+                          {status?.status === "processing"
+                            ? `${status.progress}% hotovo`
+                            : "Připravuji tvůj plakát..."}
+                        </p>
+                      </div>
+                      <div className="w-56 h-2 bg-stone-300 rounded-full overflow-hidden">
                         <div
-                          className="absolute inset-0 opacity-5"
+                          className={`h-full ${currentTheme.colors.primaryButton} transition-all duration-500 ease-out`}
                           style={{
-                            backgroundImage: `
+                            width: `${status?.progress ?? 0}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : status?.url ? (
+                  <img
+                    src={status.url}
+                    alt="Vygenerovaný mapový plakát"
+                    className="w-full h-full object-contain"
+                    data-testid="poster-preview"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3">
+                    <div
+                      className="absolute inset-0 opacity-5"
+                      style={{
+                        backgroundImage: `
                               linear-gradient(to right, currentColor 1px, transparent 1px),
                               linear-gradient(to bottom, currentColor 1px, transparent 1px)
                             `,
-                            backgroundSize: "60px 60px",
-                          }}
-                        />
-                        <MapPinIcon className="size-16 text-slate-400 dark:text-slate-600" />
-                        <div className="space-y-2">
-                          <h3 className="text-2xl font-bold text-slate-700 dark:text-slate-300">
-                            Your Map Preview
-                          </h3>
-                          <p className="text-slate-500 dark:text-slate-500 max-w-sm">
-                            Enter a location and select a
-                            theme to generate your custom
-                            map poster
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                        backgroundSize: "60px 60px",
+                      }}
+                    />
+                    <MapPinIcon className="size-14 text-stone-400" />
+                    <div className="space-y-1">
+                      <h3
+                        className={`text-xl font-bold ${currentTheme.colors.headlineText} transition-colors duration-500`}
+                      >
+                        Náhled Tvé Mapy
+                      </h3>
+                      <p
+                        className={`${currentTheme.colors.mutedText} max-w-xs text-sm transition-colors duration-500`}
+                      >
+                        Zadej místo a vyber téma pro
+                        vygenerování tvého vlastního
+                        mapového plakátu
+                      </p>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
+                )}
+              </div>
             </div>
 
-            <div className="order-1 lg:order-2">
-              <Card className="sticky top-8 border-2 border-slate-200 dark:border-slate-800 shadow-xl">
-                <CardContent className="p-6 space-y-6">
-                  <div className="space-y-2">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                      Customize Your Map
+            <div className="order-1 lg:order-2 flex h-full">
+              <Card
+                className={`lg:sticky lg:top-8 border-2 ${currentTheme.colors.cardBorder} ${currentTheme.colors.cardBg} shadow-xl transition-all duration-500 flex-1 h-full`}
+              >
+                <CardContent className="p-4 h-full flex flex-col gap-3">
+                  <div>
+                    <h2
+                      className={`text-lg font-bold ${currentTheme.colors.headlineText} transition-colors duration-500`}
+                    >
+                      Přizpůsob Si Mapu
                     </h2>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      Choose your location and style
+                    <p
+                      className={`text-xs ${currentTheme.colors.bodyText} transition-colors duration-500`}
+                    >
+                      Vyber si místo a styl
                     </p>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Location
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <label
+                        className={`text-xs font-medium ${currentTheme.colors.bodyText} transition-colors duration-500`}
+                      >
+                        Místo
                       </label>
                       <div className="relative">
-                        <MapPinIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+                        <MapPinIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-stone-400" />
                         <Input
-                          placeholder="Enter city or address"
+                          placeholder="Zadej město nebo adresu"
                           value={location}
                           onChange={(e) =>
                             setLocation(e.target.value)
                           }
-                          className="pl-10"
+                          className={`pl-10 h-9 text-sm ${currentTheme.colors.inputBorder} ${currentTheme.colors.inputFocus} transition-colors duration-500`}
                         />
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-500">
-                        Try: Prague, New York, Tokyo, Paris
-                      </p>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Theme
-                      </label>
-                      <Select
-                        value={selectedTheme}
-                        onValueChange={(value) => {
-                          if (value)
-                            setSelectedTheme(value);
-                        }}
+                    <div className="space-y-1">
+                      <label
+                        className={`text-xs font-medium ${currentTheme.colors.bodyText} transition-colors duration-500`}
                       >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select a theme">
-                            {themes.find(
-                              (t) => t.id === selectedTheme
-                            )?.name ?? "Select a theme"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {themes.map((theme) => (
-                            <SelectItem
+                        Téma ({posterThemes.length})
+                      </label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {posterThemes.map((theme) => {
+                          const isSelected =
+                            theme.id ===
+                            selectedPosterTheme;
+                          return (
+                            <button
                               key={theme.id}
-                              value={theme.id}
+                              onClick={() =>
+                                setSelectedPosterTheme(
+                                  theme.id
+                                )
+                              }
+                              className={`
+                                relative px-2 py-1.5 rounded-md border text-center transition-all duration-200
+                                ${
+                                  isSelected
+                                    ? `${currentTheme.colors.selectedBorder} ${currentTheme.colors.accentBg} font-semibold`
+                                    : `${currentTheme.colors.cardBorder} hover:bg-stone-50`
+                                }
+                              `}
                             >
-                              {theme.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-slate-500 dark:text-slate-500">
-                        {themes.length} unique styles
-                        available
-                      </p>
+                              <span
+                                className={`text-[11px] ${isSelected ? currentTheme.colors.accentText : currentTheme.colors.bodyText} transition-colors duration-500`}
+                              >
+                                {theme.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <Button
                       onClick={handleGenerate}
                       disabled={
                         !location ||
-                        !selectedTheme ||
+                        !selectedPosterTheme ||
                         isGenerating
                       }
-                      className="w-full h-12 text-base font-semibold"
+                      className={`w-full h-9 text-sm font-semibold ${currentTheme.colors.primaryButton} text-white transition-all duration-500`}
                       size="lg"
                     >
                       {isGenerating ? (
                         <>
                           <SparklesIcon className="size-5 animate-spin" />
-                          Generating...
+                          Generuji...
                         </>
                       ) : (
                         <>
                           <SparklesIcon className="size-5" />
-                          Generate Map
+                          Vygenerovat Mapu
                         </>
                       )}
                     </Button>
                   </div>
 
                   {status?.status === "failed" && (
-                    <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                      <p className="text-sm text-red-700 dark:text-red-400">
-                        Generation failed. Please try again.
+                    <div className="p-4 rounded-lg bg-red-50 border border-red-200">
+                      <p className="text-sm text-red-700">
+                        Generování selhalo. Zkus to prosím
+                        znovu.
                       </p>
                     </div>
                   )}
 
                   {status?.status === "completed" && (
-                    <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                      <p className="text-sm text-green-700 dark:text-green-400 font-medium">
-                        Map generated successfully!
+                    <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+                      <p className="text-sm text-green-700 font-medium">
+                        Mapa úspěšně vygenerována!
                       </p>
                     </div>
                   )}
@@ -327,31 +580,45 @@ function Home() {
         <div className="container mx-auto px-4 py-16">
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             <div className="text-center space-y-3">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mb-2">
+              <div
+                className={`inline-flex items-center justify-center w-12 h-12 rounded-full ${currentTheme.colors.accentBg} ${currentTheme.colors.accentText} mb-2 transition-colors duration-500`}
+              >
                 <SparklesIcon className="size-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                17 Unique Themes
+              <h3
+                className={`text-lg font-bold ${currentTheme.colors.headlineText} transition-colors duration-500`}
+              >
+                17 Unikátních Témat
               </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                From minimalist to vibrant, find the perfect
-                style for your space
+              <p
+                className={`text-sm ${currentTheme.colors.bodyText} transition-colors duration-500`}
+              >
+                Od minimalistických po živé, najdi perfektní
+                styl pro tvůj prostor
               </p>
             </div>
             <div className="text-center space-y-3">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mb-2">
+              <div
+                className={`inline-flex items-center justify-center w-12 h-12 rounded-full ${currentTheme.colors.accentBg} ${currentTheme.colors.accentText} mb-2 transition-colors duration-500`}
+              >
                 <MapPinIcon className="size-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                Any Location
+              <h3
+                className={`text-lg font-bold ${currentTheme.colors.headlineText} transition-colors duration-500`}
+              >
+                Jakékoliv Místo
               </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Create maps of cities, neighborhoods, or
-                special places worldwide
+              <p
+                className={`text-sm ${currentTheme.colors.bodyText} transition-colors duration-500`}
+              >
+                Vytvoř mapy měst, čtvrtí nebo speciálních
+                míst po celém světě
               </p>
             </div>
             <div className="text-center space-y-3">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mb-2">
+              <div
+                className={`inline-flex items-center justify-center w-12 h-12 rounded-full ${currentTheme.colors.accentBg} ${currentTheme.colors.accentText} mb-2 transition-colors duration-500`}
+              >
                 <svg
                   className="size-6"
                   fill="none"
@@ -366,16 +633,25 @@ function Home() {
                   />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                Instant Generation
+              <h3
+                className={`text-lg font-bold ${currentTheme.colors.headlineText} transition-colors duration-500`}
+              >
+                Okamžité Generování
               </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                AI-powered rendering delivers your poster in
-                seconds
+              <p
+                className={`text-sm ${currentTheme.colors.bodyText} transition-colors duration-500`}
+              >
+                AI-powered vykreslování dodá tvůj plakát
+                během vteřin
               </p>
             </div>
           </div>
         </div>
+
+        <ThemeSwitcher
+          currentTheme={designTheme}
+          onThemeChange={handleThemeChange}
+        />
       </div>
     </WebLayout>
   );

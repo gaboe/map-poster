@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-01-31T18:19:02.314Z",
+  "updatedAt": "2026-02-01T11:07:30.869Z",
   "packages": [
     {
       "name": "opensrc",
@@ -13,7 +13,7 @@
       "version": "0.7.0",
       "registry": "npm",
       "path": "repos/github.com/BeaconBay/ck",
-      "fetchedAt": "2026-01-08T13:11:43.253Z"
+      "fetchedAt": "2026-02-01T11:07:30.868Z"
     },
     {
       "name": "@tanstack/react-router",
