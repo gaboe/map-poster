@@ -16,7 +16,6 @@ export const Route = createFileRoute("/app")({
       ),
     ]);
   },
-  // @ts-expect-error tsgo inference bug: https://github.com/TanStack/router/issues/5724
   beforeLoad: async ({ context }) => {
     if (!context.session?.user) {
       throw redirect({ to: "/sign-in" });
