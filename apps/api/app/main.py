@@ -9,6 +9,10 @@ Main application entry point with:
 - Background job processor
 """
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import logging
 from contextlib import asynccontextmanager
 
@@ -19,6 +23,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.job_queue import start_job_processor
+from app.routes.admin import router as admin_router
 from app.routes.generate import limiter, router as generate_router
 from app.themes import list_themes
 
@@ -74,6 +79,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Include routers
 app.include_router(generate_router)
+app.include_router(admin_router)
 
 
 @app.get("/api/health")

@@ -8,6 +8,20 @@
       "when": 1763030132812,
       "tag": "0000_zippy_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769946208785,
+      "tag": "0001_add-osm-data-sources",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769962481286,
+      "tag": "0002_chemical_felicia_hardy",
+      "breakpoints": true
     }
   ]
 }

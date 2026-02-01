@@ -20,12 +20,15 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import osmnx as ox
-from geopandas import GeoDataFrame
+import pandas as pd
+import psycopg2
+from geopandas import GeoDataFrame, read_postgis
 from geopy.geocoders import Nominatim
 from matplotlib.font_manager import FontProperties
 from networkx import MultiDiGraph
 from shapely.geometry import Point
 
+from app.db import get_database_url
 from app.themes import load_theme
 
 
@@ -260,6 +263,156 @@ def fetch_graph(point: Tuple[float, float], dist: int) -> Optional[MultiDiGraph]
         return None
 
 
+def _build_graph_from_lines(lines: GeoDataFrame) -> Optional[MultiDiGraph]:
+    if lines.empty:
+        return None
+
+    nodes: dict[tuple[float, float], int] = {}
+    node_rows: list[dict[str, Any]] = []
+    edge_rows: list[dict[str, Any]] = []
+    edge_key = 0
+
+    for _, row in lines.iterrows():
+        geometry = row.get("geometry")
+        if geometry is None or geometry.is_empty:
+            continue
+
+        if geometry.geom_type == "LineString":
+            geometries = [geometry]
+        elif geometry.geom_type == "MultiLineString":
+            geometries = list(geometry.geoms)
+        else:
+            continue
+
+        for line in geometries:
+            if line.is_empty:
+                continue
+
+            start = line.coords[0]
+            end = line.coords[-1]
+
+            if start not in nodes:
+                node_id = len(nodes)
+                nodes[start] = node_id
+                node_rows.append(
+                    {
+                        "osmid": node_id,
+                        "x": start[0],
+                        "y": start[1],
+                        "geometry": Point(start),
+                    }
+                )
+
+            if end not in nodes:
+                node_id = len(nodes)
+                nodes[end] = node_id
+                node_rows.append(
+                    {
+                        "osmid": node_id,
+                        "x": end[0],
+                        "y": end[1],
+                        "geometry": Point(end),
+                    }
+                )
+
+            edge_rows.append(
+                {
+                    "u": nodes[start],
+                    "v": nodes[end],
+                    "key": edge_key,
+                    "geometry": line,
+                    "highway": row.get("highway"),
+                }
+            )
+            edge_key += 1
+
+    if not node_rows or not edge_rows:
+        return None
+
+    nodes_gdf: GeoDataFrame = GeoDataFrame(
+        pd.DataFrame(node_rows),
+        geometry="geometry",
+        crs="EPSG:4326",
+    ).set_index("osmid")
+
+    edges_gdf: GeoDataFrame = GeoDataFrame(
+        pd.DataFrame(edge_rows),
+        geometry="geometry",
+        crs="EPSG:4326",
+    ).set_index(["u", "v", "key"])
+
+    return ox.graph_from_gdfs(
+        nodes_gdf,
+        edges_gdf,
+        graph_attrs={"crs": "EPSG:4326"},
+    )
+
+
+def _bbox_from_point(
+    point: Tuple[float, float], dist: int
+) -> Tuple[float, float, float, float]:
+    north, south, east, west = ox.utils_geo.bbox_from_point(point, dist)
+    return west, south, east, north
+
+
+def is_location_available(point: Tuple[float, float], dist: int) -> bool:
+    west, south, east, north = _bbox_from_point(point, dist)
+    query = """
+        SELECT 1
+        FROM planet_osm_line
+        WHERE highway IS NOT NULL
+        AND way && ST_Transform(ST_MakeEnvelope(%s, %s, %s, %s, 4326), 3857)
+        LIMIT 1
+    """
+
+    with psycopg2.connect(get_database_url()) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(query, (west, south, east, north))
+            return cursor.fetchone() is not None
+
+
+def fetch_graph_postgis(
+    point: Tuple[float, float], dist: int
+) -> Optional[MultiDiGraph]:
+    lat, lon = point
+    graph_key = f"graph_postgis_{lat}_{lon}_{dist}"
+    cached = cache_get(graph_key)
+    if cached is not None:
+        return cast(MultiDiGraph, cached)
+
+    west, south, east, north = _bbox_from_point(point, dist)
+    query = """
+        SELECT
+            osm_id,
+            highway,
+            ST_Transform(way, 4326) AS geometry
+        FROM planet_osm_line
+        WHERE highway IS NOT NULL
+        AND way && ST_Transform(ST_MakeEnvelope(%s, %s, %s, %s, 4326), 3857)
+    """
+
+    try:
+        lines = read_postgis(
+            query,
+            get_database_url(),
+            geom_col="geometry",
+            params=(west, south, east, north),
+        )
+
+        graph = _build_graph_from_lines(lines)
+        if graph is None:
+            return None
+
+        try:
+            cache_set(graph_key, graph)
+        except CacheError:
+            pass
+
+        return graph
+    except Exception:
+        return None
+
+
 def fetch_features(
     point: Tuple[float, float], dist: int, tags: Dict[str, Any], name: str
 ) -> Optional[GeoDataFrame]:
@@ -289,6 +442,62 @@ def fetch_features(
             cache_set(features_key, data)
         except CacheError:
             pass
+        return data
+    except Exception:
+        return None
+
+
+def fetch_features_postgis(
+    point: Tuple[float, float], dist: int, tags: Dict[str, Any], name: str
+) -> Optional[GeoDataFrame]:
+    lat, lon = point
+    tag_str = "_".join(tags.keys())
+    features_key = f"{name}_postgis_{lat}_{lon}_{dist}_{tag_str}"
+    cached = cache_get(features_key)
+    if cached is not None:
+        return cast(GeoDataFrame, cached)
+
+    conditions = []
+    params: list[Any] = []
+
+    for key, value in tags.items():
+        column = f'"{key}"'
+        if isinstance(value, list):
+            placeholders = ", ".join(["%s"] * len(value))
+            conditions.append(f"{column} IN ({placeholders})")
+            params.extend(value)
+        else:
+            conditions.append(f"{column} = %s")
+            params.append(value)
+
+    if not conditions:
+        return None
+
+    west, south, east, north = _bbox_from_point(point, dist)
+    params.extend([west, south, east, north])
+
+    query = f"""
+        SELECT
+            osm_id,
+            ST_Transform(way, 4326) AS geometry
+        FROM planet_osm_polygon
+        WHERE ({" OR ".join(conditions)})
+        AND way && ST_Transform(ST_MakeEnvelope(%s, %s, %s, %s, 4326), 3857)
+    """
+
+    try:
+        data = read_postgis(
+            query,
+            get_database_url(),
+            geom_col="geometry",
+            params=tuple(params),
+        )
+
+        try:
+            cache_set(features_key, data)
+        except CacheError:
+            pass
+
         return data
     except Exception:
         return None
@@ -503,18 +712,21 @@ def create_poster(
     compensated_dist = distance * (max(height, width) / min(height, width)) / 4
 
     # Fetch data
-    g = fetch_graph(point, int(compensated_dist))
+    if not is_location_available(point, int(compensated_dist)):
+        raise RuntimeError("Location is not available in imported OSM data.")
+
+    g = fetch_graph_postgis(point, int(compensated_dist))
     if g is None:
         raise RuntimeError("Failed to retrieve street network data.")
 
-    water = fetch_features(
+    water = fetch_features_postgis(
         point,
         int(compensated_dist),
         tags={"natural": ["water", "bay", "strait"], "waterway": "riverbank"},
         name="water",
     )
 
-    parks = fetch_features(
+    parks = fetch_features_postgis(
         point,
         int(compensated_dist),
         tags={"leisure": "park", "landuse": "grass"},

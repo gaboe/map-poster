@@ -31,7 +31,9 @@ uv run pytest tests/test_health.py
 
 ## Environment Variables
 
-No environment variables are required for local development. The API works with sensible defaults.
+### Required
+
+- `DATABASE_URL` - PostgreSQL connection string (PostGIS required)
 
 ## API Endpoints
 
@@ -287,6 +289,25 @@ grep "FROM python" Dockerfile
 - **Theme listing:** <50ms
 - **Poster generation:** 5-30 seconds (depends on zoom level and theme complexity)
 - **Cache hit:** <100ms
+
+## OSM Data Import
+
+### Server Requirements
+
+- **RAM:** 4-8GB recommended (import can use 2-4GB)
+- **Disk:** 10GB+ free (CZ ~2GB, SK ~1GB after import)
+
+### Triggering Import
+
+1. Go to Admin → OSM Data Sources
+2. Click **Import** for Czech Republic or Slovakia
+3. Wait for completion (can take 30-60 minutes)
+
+### Troubleshooting
+
+- **Import fails with OOM:** Upgrade server RAM to 8GB
+- **Slow poster generation:** Verify PostGIS is available and indexes exist
+- **Location not available:** Coordinates must be within CZ/SK imports
 
 ## License
 

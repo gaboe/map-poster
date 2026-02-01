@@ -17,6 +17,13 @@ RUN uv sync --frozen --no-dev
 # Stage 2: Runtime - Minimal production image
 FROM python:3.12-slim
 
+# Install runtime dependencies for OSM import and PostGIS
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    osmium-tool \
+    osm2pgsql \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser
 
