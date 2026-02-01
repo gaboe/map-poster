@@ -1,0 +1,67 @@
+services:
+  db:
+    image: imresamu/postgis:17-3.5
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web-app:
+    build:
+      context: .
+      dockerfile: apps/web-app/Dockerfile
+      args:
+        VERSION: ${VERSION}
+    environment:
+      - BASE_URL=${BASE_URL}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - BREVO_API_KEY=${BREVO_API_KEY}
+      - CONTACT_FORM_RECIPIENTS=${CONTACT_FORM_RECIPIENTS}
+      - DATABASE_URL=${DATABASE_URL}
+      - ENVIRONMENT=${ENVIRONMENT}
+      - MAP_POSTER_API_URL=http://api:8000
+      - SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - VERSION=${VERSION}
+      - VITE_BASE_URL=${VITE_BASE_URL}
+      - VITE_BETTER_AUTH_URL=${VITE_BETTER_AUTH_URL}
+      - VITE_ENVIRONMENT=${VITE_ENVIRONMENT}
+      - VITE_SENTRY_DSN=${VITE_SENTRY_DSN}
+      - VITE_VERSION=${VITE_VERSION}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.services.web.loadbalancer.server.port=3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      - api-cache:/app/cache
+      - api-posters:/app/posters
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.services.api.loadbalancer.server.port=8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  api-cache:
+  api-posters:

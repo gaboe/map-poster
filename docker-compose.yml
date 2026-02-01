@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18-alpine
+    image: imresamu/postgis:17-3.5
     environment:
       - POSTGRES_USER=map-poster-user
       - POSTGRES_PASSWORD=pwd123
@@ -10,6 +10,11 @@ services:
     ports:
       - "25540:5432"
     shm_size: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U map-poster-user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   web-app:
     build:
@@ -20,9 +25,25 @@ services:
     env_file:
       - ./apps/web-app/.env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
     ports:
       - "3000:3000"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    volumes:
+      - api-cache:/app/cache
+      - api-posters:/app/posters
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
 
   pre-deployment:
     build:
@@ -31,7 +52,8 @@ services:
     env_file:
       - ./jobs/pre-deployment/.env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: "no"
 
   post-deployment:
@@ -41,8 +63,11 @@ services:
     env_file:
       - ./jobs/post-deployment/.env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: "no"
 
 volumes:
   db-data:
+  api-cache:
+  api-posters:
