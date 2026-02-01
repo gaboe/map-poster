@@ -1,10 +1,133 @@
-# ck respects .gitignore syntax
-# Add files that are in git but not useful for semantic search
+# .ckignore - Patterns for ck semantic search
+# Syntax: same as .gitignore (glob patterns, ! for negation)
+
+# === PROJECT-SPECIFIC ===
 
 # ck index/cache directory
 .ck/
 
+# Lock files
 bun.lock
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+uv.lock
 
 # External source code for reference only
 opensrc/
+
+# Vendored/bundled dependencies (tracked in git but not our code)
+.opencode/node_modules/
+node_modules/
+**/node_modules/
+
+# Python API cache (OSM data pickles)
+apps/api/cache/
+
+# Source maps (not useful for semantic search)
+*.map
+*.js.map
+*.mjs.map
+*.cjs.map
+
+# Generated files
+*.gen.ts
+routeTree.gen.ts
+*.tsbuildinfo
+
+# Test artifacts
+test-results/
+playwright-report/
+coverage/
+
+# Build outputs (already in .gitignore but explicit here)
+dist/
+build/
+.output/
+.vinxi/
+.tanstack/
+
+# Logs
+logs/
+*.log
+
+# === DEFAULT CK PATTERNS ===
+
+# Images
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.svg
+*.ico
+*.webp
+*.tiff
+*.ttf
+*.woff
+*.woff2
+*.eot
+
+# Video
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wmv
+*.flv
+*.webm
+
+# Audio
+*.mp3
+*.wav
+*.flac
+*.aac
+*.ogg
+*.m4a
+
+# Binary/Compiled
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.obj
+*.o
+*.pyc
+*.pyo
+*.class
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.bz2
+*.gz
+
+# Data files
+*.db
+*.sqlite
+*.sqlite3
+*.parquet
+*.arrow
+*.pickle
+*.pkl
+
+# Config formats (low semantic value)
+*.json
+*.yaml
+*.yml
+*.toml
+*.xml
+*.csv
+
+# Documentation that's not code
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx

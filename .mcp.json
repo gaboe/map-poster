@@ -5,7 +5,7 @@
       "command": "sh",
       "args": [
         "-c",
-        "npx -y @beaconbay/ck-search --index . --model jina-code && npx -y @beaconbay/ck-search --serve"
+        "ck --index . --model jina-code && ck --serve"
       ],
       "cwd": "."
     }

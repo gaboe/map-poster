@@ -14,6 +14,7 @@ NC='\033[0m' # No Color
 
 # Array of .env.example file locations
 ENV_EXAMPLES=(
+  "apps/api/.env.example"
   "apps/web-app/.env.example"
   "packages/db/.env.example"
   "jobs/pre-deployment/.env.example"
@@ -129,7 +130,28 @@ else
 fi
 echo ""
 
-echo "🔍 Step 8: Warming up CK semantic search index..."
+echo "🔍 Step 8: Installing CK semantic search tool..."
+echo ""
+
+# Check if ck is installed
+if ! command -v ck &> /dev/null; then
+  # Check if cargo is installed
+  if ! command -v cargo &> /dev/null; then
+    printf "${YELLOW}⚠${NC} Rust is not installed. Installing via rustup...\n"
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
+    printf "${GREEN}✓${NC} Rust installed!\n"
+  fi
+  
+  printf "${BLUE}ℹ${NC} Installing ck-search via cargo (this may take a minute)...\n"
+  cargo install ck-search
+  printf "${GREEN}✓${NC} ck-search installed!\n"
+else
+  printf "${GREEN}✓${NC} ck is already installed\n"
+fi
+echo ""
+
+echo "🔎 Step 9: Warming up CK semantic search index..."
 printf "${YELLOW}ℹ${NC}  First run may take a few minutes to build the index (jina-code model).\n"
 printf "${YELLOW}ℹ${NC}  Subsequent runs use delta indexing and are much faster.\n"
 bun run ck:warmup &

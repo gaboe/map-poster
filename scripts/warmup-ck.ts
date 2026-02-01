@@ -17,9 +17,7 @@ const verbose =
 
 async function runIndex(): Promise<number> {
   const args = [
-    "npx",
-    "-y",
-    "@beaconbay/ck-search",
+    "ck",
     "--index",
     ".",
     "--model",
@@ -32,12 +30,16 @@ async function runIndex(): Promise<number> {
 
   const proc = Bun.spawn(args, {
     stdout: "inherit",
-    stderr: "pipe",
+    stderr: verbose ? "inherit" : "pipe",
   });
 
-  const stderrText = await new Response(proc.stderr).text();
-  if (stderrText) {
-    console.error(stderrText);
+  if (!verbose && proc.stderr) {
+    const stderrText = await new Response(
+      proc.stderr
+    ).text();
+    if (stderrText) {
+      console.error(stderrText);
+    }
   }
 
   const exitCode = await proc.exited;
@@ -48,10 +50,10 @@ async function cleanIndex(): Promise<void> {
   console.log(
     "Cleaning old index due to model mismatch..."
   );
-  const proc = Bun.spawn(
-    ["npx", "-y", "@beaconbay/ck-search", "--clean", "."],
-    { stdout: "inherit", stderr: "inherit" }
-  );
+  const proc = Bun.spawn(["ck", "--clean", "."], {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
   await proc.exited;
 }
 
