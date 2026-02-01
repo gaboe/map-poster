@@ -1,60 +1,40 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppLayout } from "@/shared/layout/app-layout";
-import { Link } from "@tanstack/react-router";
 import { Button } from "@/shared/ui/button";
-import { CreateOrganizationDialog } from "@/organizations/components/create-organization-dialog";
-import { CreateProjectDialog } from "@/organizations/components/create-project-dialog";
 import {
   useSuspenseQuery,
   useMutation,
 } from "@tanstack/react-query";
 import { useTRPC } from "@/infrastructure/trpc/react";
-import { ProjectCard } from "@/projects/components/project-card";
 import { StatCard } from "@/shared/ui/stat-card";
 import { ResponsiveCard } from "@/shared/ui/responsive-card";
 import {
-  Empty,
-  EmptyHeader,
-  EmptyTitle,
-  EmptyDescription,
-  EmptyContent,
-} from "@/shared/ui/empty";
-import { IconEye, IconBug } from "@tabler/icons-react";
-import { getSortPreferenceServerFn } from "@/infrastructure/sort-preferences";
-import { OrganizationRoles } from "@map-poster/common";
-import { PendingInvitationModal } from "@/dashboard/pending-invitation-modal";
+  IconBug,
+  IconDatabase,
+  IconUsers,
+  IconMap,
+} from "@tabler/icons-react";
 import { toast } from "sonner";
-import { Suspense } from "react";
+import { useUserInfo } from "@/hooks/users/use-user-info";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/app/dashboard")({
   loader: async ({ context }) => {
-    // Fetch critical data and prefetch secondary data in parallel
-    const [orgsWithProjects, sortPreference] =
-      await Promise.all([
-        context.queryClient.fetchQuery(
-          context.trpc.organization.getOrganizationsDetails.queryOptions()
-        ),
-        getSortPreferenceServerFn({
-          data: "dashboard",
-        }),
-      ]);
-
-    // Prefetch pending invitations (used by PendingInvitationModal)
-    void context.queryClient.prefetchQuery(
-      context.trpc.organizationInvitations.getPendingInvitationsForUser.queryOptions()
+    await context.queryClient.prefetchQuery(
+      context.trpc.admin.osmData.list.queryOptions()
     );
-
-    return { orgsWithProjects, sortPreference };
+    void context.queryClient.prefetchQuery(
+      context.trpc.admin.getUserStats.queryOptions()
+    );
+    return {};
   },
   component: DashboardPage,
 });
 
 function DashboardPage() {
   const trpc = useTRPC();
-
-  const { data: orgsWithProjects = [] } = useSuspenseQuery(
-    trpc.organization.getOrganizationsDetails.queryOptions()
-  );
+  const { data: user } = useUserInfo();
+  const isAdmin = user?.role === "admin";
 
   const {
     mutate: testBackendError,
@@ -72,209 +52,208 @@ function DashboardPage() {
     throw new Error("Test Sentry Frontend Error");
   };
 
-  const hasOrganizations = orgsWithProjects.length > 0;
-
-  // Separate admin and member organizations
-  const adminOrgs = orgsWithProjects.filter(
-    (org) =>
-      org.userRole === OrganizationRoles.Owner ||
-      org.userRole === OrganizationRoles.Admin
-  );
-  const memberOrgs = orgsWithProjects.filter(
-    (org) => org.userRole === OrganizationRoles.Member
-  );
-
-  const totalProjects = orgsWithProjects.reduce(
-    (acc, org) => acc + org.projects.length,
-    0
-  );
-
   return (
     <AppLayout
       title="Dashboard"
-      description="Manage your organizations and projects"
+      description="Map Poster Admin Dashboard"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 xl:py-6">
-        {/* Stats Section */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 xl:gap-4 mb-4 xl:mb-6">
-          <StatCard
-            label="Organizations"
-            value={orgsWithProjects.length}
-          />
-          {adminOrgs.length > 0 && (
-            <StatCard
-              label="Projects"
-              value={totalProjects}
-            />
-          )}
-          {memberOrgs.length > 0 &&
-            adminOrgs.length === 0 && (
-              <div className="col-span-2 sm:col-span-2">
-                <StatCard
-                  label="Member of"
-                  value={`${memberOrgs.length} organization${memberOrgs.length === 1 ? "" : "s"}`}
-                />
-              </div>
-            )}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            Vítejte v Map Poster
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Správa mapových podkladů a uživatelů
+          </p>
         </div>
 
-        {/* Sentry Test Buttons */}
-        <div className="mb-4 xl:mb-6 flex gap-2">
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleFrontendError}
-          >
-            <IconBug className="size-4 mr-2" />
-            Test Frontend Error
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => testBackendError()}
-            disabled={isTestingBackend}
-          >
-            <IconBug className="size-4 mr-2" />
-            Test Backend Error
-          </Button>
-        </div>
+        {isAdmin && <AdminDashboard />}
 
-        {/* Organizations and Projects */}
-        {hasOrganizations ? (
-          <div className="space-y-4 xl:space-y-6">
-            {/* Header with Create Organization Button */}
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                My Organizations
-              </h2>
-              <CreateOrganizationDialog />
-            </div>
-            {orgsWithProjects.map((orgWithProjects) => {
-              const userRole = orgWithProjects.userRole;
-              const isAdmin =
-                userRole === OrganizationRoles.Owner ||
-                userRole === OrganizationRoles.Admin;
-              const isMember =
-                userRole === OrganizationRoles.Member;
-
-              return (
-                <ResponsiveCard
-                  key={orgWithProjects.organization.id}
-                  padding="md"
-                >
-                  <div className="mb-4 xl:mb-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-lg xl:text-xl font-semibold text-gray-900 dark:text-gray-100">
-                          {
-                            orgWithProjects.organization
-                              .name
-                          }
-                        </h2>
-                        {isMember ? (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            You are a member of this
-                            organization
-                          </p>
-                        ) : null}
-                      </div>
-                      {isAdmin && (
-                        <Link
-                          to="/app/organization/$id"
-                          params={{
-                            id: orgWithProjects.organization
-                              .id,
-                          }}
-                        >
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-sm"
-                          >
-                            <IconEye className="size-3 mr-1" />
-                            View
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Projects Section */}
-                  {orgWithProjects.projects.length > 0 ? (
-                    <>
-                      <div className="flex items-center justify-between mb-3 xl:mb-4">
-                        <h3 className="text-sm xl:text-base font-medium text-gray-900 dark:text-gray-100">
-                          Projects
-                        </h3>
-                        {isAdmin && (
-                          <CreateProjectDialog
-                            organizationId={
-                              orgWithProjects.organization
-                                .id
-                            }
-                          />
-                        )}
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 xl:gap-4">
-                        {orgWithProjects.projects.map(
-                          (project) => (
-                            <ProjectCard
-                              key={project.id}
-                              project={project}
-                              disabled={isMember}
-                            />
-                          )
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <Empty className="border-0 p-0 py-8 xl:py-10">
-                      <EmptyHeader>
-                        <EmptyTitle>
-                          No projects yet
-                        </EmptyTitle>
-                        {!isAdmin && (
-                          <EmptyDescription>
-                            Contact an admin to create
-                            projects
-                          </EmptyDescription>
-                        )}
-                      </EmptyHeader>
-                      {isAdmin && (
-                        <EmptyContent>
-                          <CreateProjectDialog
-                            organizationId={
-                              orgWithProjects.organization
-                                .id
-                            }
-                          />
-                        </EmptyContent>
-                      )}
-                    </Empty>
-                  )}
-                </ResponsiveCard>
-              );
-            })}
+        <ResponsiveCard padding="md" className="mt-6">
+          <h2 className="text-lg font-semibold mb-4">
+            Sentry Test
+          </h2>
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleFrontendError}
+            >
+              <IconBug className="size-4 mr-2" />
+              Test Frontend Error
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => testBackendError()}
+              disabled={isTestingBackend}
+            >
+              <IconBug className="size-4 mr-2" />
+              Test Backend Error
+            </Button>
           </div>
-        ) : (
-          <Empty className="py-12 xl:py-16">
-            <EmptyHeader>
-              <EmptyTitle>Welcome to map-poster</EmptyTitle>
-              <EmptyDescription>
-                Get started by creating your first
-                organization.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <CreateOrganizationDialog />
-            </EmptyContent>
-          </Empty>
-        )}
+        </ResponsiveCard>
+      </div>
+    </AppLayout>
+  );
+}
+
+function AdminDashboard() {
+  const trpc = useTRPC();
+
+  const { data: osmDataSources = [] } = useSuspenseQuery(
+    trpc.admin.osmData.list.queryOptions()
+  );
+
+  const { data: userStats } = useSuspenseQuery(
+    trpc.admin.getUserStats.queryOptions()
+  );
+
+  const completedSources = osmDataSources.filter(
+    (s) => s.status === "completed"
+  );
+  const pendingSources = osmDataSources.filter(
+    (s) =>
+      s.status === "pending" ||
+      s.status === "downloading" ||
+      s.status === "converting" ||
+      s.status === "importing"
+  );
+
+  return (
+    <>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 xl:gap-4 mb-6">
+        <StatCard
+          label="Celkem uživatelů"
+          value={userStats?.totalUsers ?? 0}
+        />
+        <StatCard
+          label="Admin uživatelů"
+          value={userStats?.adminUsersCount ?? 0}
+        />
+        <StatCard
+          label="Aktivní (24h)"
+          value={userStats?.activeUsersLast24h ?? 0}
+        />
+        <StatCard
+          label="OSM importy"
+          value={completedSources.length}
+        />
       </div>
 
-      <Suspense fallback={null}>
-        <PendingInvitationModal />
-      </Suspense>
-    </AppLayout>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 xl:gap-6">
+        <ResponsiveCard padding="md">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <IconDatabase className="size-5" />
+              OSM Data Status
+            </h2>
+            <Link to="/app/admin/osm-data">
+              <Button variant="outline" size="sm">
+                Spravovat
+              </Button>
+            </Link>
+          </div>
+
+          <div className="space-y-3">
+            {osmDataSources.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                Žádné OSM zdroje
+              </p>
+            ) : (
+              osmDataSources.slice(0, 5).map((source) => (
+                <div
+                  key={source.id}
+                  className="flex items-center justify-between py-2 border-b last:border-0"
+                >
+                  <div className="flex items-center gap-2">
+                    <IconMap className="size-4 text-muted-foreground" />
+                    <span className="font-medium">
+                      {source.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      ({source.code})
+                    </span>
+                  </div>
+                  <StatusBadge status={source.status} />
+                </div>
+              ))
+            )}
+          </div>
+
+          {pendingSources.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-4">
+              {pendingSources.length} zdrojů čeká na import
+            </p>
+          )}
+        </ResponsiveCard>
+
+        <ResponsiveCard padding="md">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <IconUsers className="size-5" />
+              Uživatelé
+            </h2>
+            <Link to="/app/admin/users">
+              <Button variant="outline" size="sm">
+                Spravovat
+              </Button>
+            </Link>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">
+                Celkem uživatelů
+              </span>
+              <span className="font-medium">
+                {userStats?.totalUsers ?? 0}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">
+                Administrátoři
+              </span>
+              <span className="font-medium">
+                {userStats?.adminUsersCount ?? 0}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">
+                Aktivní za 24h
+              </span>
+              <span className="font-medium">
+                {userStats?.activeUsersLast24h ?? 0}
+              </span>
+            </div>
+          </div>
+        </ResponsiveCard>
+      </div>
+    </>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    completed:
+      "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    importing:
+      "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    downloading:
+      "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    converting:
+      "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    pending:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+    failed:
+      "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  };
+
+  return (
+    <span
+      className={`px-2 py-0.5 text-xs font-medium rounded ${colors[status] ?? "bg-gray-100 text-gray-800"}`}
+    >
+      {status}
+    </span>
   );
 }

@@ -25,7 +25,6 @@ import {
 } from "@/shared/ui/sidebar";
 import { Link } from "@tanstack/react-router";
 import { useRouterState } from "@tanstack/react-router";
-import OrganizationSidebarSections from "@/shared/sidebar/organization-sidebar-section";
 import { PrimaryMenuButton } from "@/shared/ui/sidebar/primary-menu-button";
 import { SecondaryMenuButton } from "@/shared/ui/sidebar/secondary-menu-button";
 import { useUserInfo } from "@/hooks/users/use-user-info";
@@ -104,9 +103,6 @@ export function AppSidebar({
                   <span>Dashboard</span>
                 </PrimaryMenuButton>
               </SidebarMenuItem>
-              <OrganizationSidebarSections
-                currentPath={currentPath}
-              />
 
               {/* Admin menu entry: always visible for admins */}
               {isAdmin && (
@@ -145,6 +141,16 @@ export function AppSidebar({
                     >
                       <IconChartBar className="!size-5" />
                       <span>Observability</span>
+                    </SecondaryMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SecondaryMenuButton
+                      render={
+                        <Link to="/app/admin/osm-data" />
+                      }
+                    >
+                      <IconDatabase className="!size-5" />
+                      <span>OSM Data</span>
                     </SecondaryMenuButton>
                   </SidebarMenuItem>
                 </>
